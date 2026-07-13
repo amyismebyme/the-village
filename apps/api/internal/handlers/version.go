@@ -14,7 +14,7 @@ type VersionResponse struct {
 func VersionHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := VersionResponse{
-		Version:   "0.1.0",
+		Version:   "0.1.1",
 		Commit:    "dev",
 		BuildDate: "2026-07-13T00:00:00Z",
 	}
