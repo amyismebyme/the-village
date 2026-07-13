@@ -31,6 +31,8 @@ func main() {
 
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/health", handlers.HealthHandler)
+   	http.HandleFunc("/version", handlers.VersionHandler)
+   	http.HandleFunc("/ready", handlers.ReadyHandler)
 
 	port := ":8080"
 
