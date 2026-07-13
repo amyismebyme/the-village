@@ -13,7 +13,7 @@ func main() {
 
 	port := ":8080"
 
-	log.Println("Starting Village API...")
+	log.Println("Starting Village-System API...")
 	log.Println("Listening on", port)
 
 	err := http.ListenAndServe(port, router)
