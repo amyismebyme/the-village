@@ -1,3 +1,1 @@
-{
-  "status": "ready"
-}
+package handlers

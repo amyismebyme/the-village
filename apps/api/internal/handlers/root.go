@@ -1,4 +1,1 @@
-{
-  "service": "village-api",
-  "status": "running"
-}
+package handlers

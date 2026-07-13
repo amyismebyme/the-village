@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"log"
 	"net/http"
-	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 )
 
 type Response struct {
