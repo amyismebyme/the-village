@@ -12,7 +12,7 @@ type ReadyResponse struct {
 func ReadyHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := ReadyResponse{
-		Status: "Ready",
+		Status: "ready",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
