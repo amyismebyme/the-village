@@ -5,20 +5,31 @@ import (
 	"net/http"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
+	"github.com/amyismebyme/the-village/apps/api/internal/config"
+
 )
 
 func main() {
 
-	router := server.NewRouter()
+		// Load application configuration
+    	cfg := config.Load()
 
-	port := ":8080"
+    	// Build router
+    	router := server.NewRouter()
 
-	log.Println("Starting Village-System API...")
-	log.Println("Listening on", port)
+    	// Build listening address
+    	address := ":" + cfg.Port
 
-	err := http.ListenAndServe(port, router)
+    	log.Println("====================================")
+    	log.Println("Starting Village API")
+    	log.Println("Environment :", cfg.Environment)
+    	log.Println("Log Level   :", cfg.LogLevel)
+    	log.Println("Listening   :", address)
+    	log.Println("====================================")
 
-	if err != nil {
-		log.Fatal(err)
-	}
+    	err := http.ListenAndServe(address, router)
+    	if err != nil {
+    		log.Fatal(err)
+    	}
+
 }
