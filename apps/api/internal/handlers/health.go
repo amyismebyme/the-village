@@ -1,5 +1,5 @@
 package handlers
-
+//Health handler for the app
 import (
 	"encoding/json"
 	"net/http"

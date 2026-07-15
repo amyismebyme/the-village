@@ -1,4 +1,5 @@
 package handlers
+//Root or Deafult handler for the app
 
 import (
 	"encoding/json"

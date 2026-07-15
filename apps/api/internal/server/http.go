@@ -1,5 +1,5 @@
 package server
-
+// Returns http server with timeouts defined in config.go
 import (
 	"net/http"
 

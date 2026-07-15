@@ -1,5 +1,5 @@
 package main
-
+//main class that go uses to execute application. Everything branches off from here
 import (
 	"context"
 	"log"

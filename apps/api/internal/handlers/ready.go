@@ -1,4 +1,5 @@
 package handlers
+//Ready handler for the app
 
 import (
 	"encoding/json"

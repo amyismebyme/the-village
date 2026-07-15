@@ -1,5 +1,5 @@
 package handlers
-
+//Version Handler for the app
 import (
 	"encoding/json"
 	"net/http"
@@ -14,7 +14,7 @@ type VersionResponse struct {
 func VersionHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := VersionResponse{
-		Version:   "0.1.1",
+		Version:   "0.1.2",
 		Commit:    "dev",
 		BuildDate: "2026-07-13T00:00:00Z",
 	}
