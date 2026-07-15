@@ -1,5 +1,5 @@
 package server
-
+// Route the different events based on handlers
 import (
 	"net/http"
 

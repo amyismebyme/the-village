@@ -1,5 +1,5 @@
 package server
-
+//Generate the active app runtime
 import "time"
 
 type Runtime struct {

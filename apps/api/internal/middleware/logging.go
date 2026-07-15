@@ -1,5 +1,5 @@
 package middleware
-
+//Logging of requests and all the details
 import (
 	"log"
 	"net/http"

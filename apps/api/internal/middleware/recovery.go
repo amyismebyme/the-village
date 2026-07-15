@@ -1,5 +1,6 @@
 package middleware
-
+// How to recover and save the application in case of any issues.and
+// Acts as a buffer
 import (
 	"log"
 	"net/http"
