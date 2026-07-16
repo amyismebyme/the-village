@@ -10,19 +10,25 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
+	"github.com/amyismebyme/the-village/apps/api/internal/logger"
 )
 
 func main() {
 
     cfg := config.Load()
+    appLogger := logger.New(cfg)
 
-	httpServer := server.NewHTTPServer(cfg)
+	httpServer := server.NewHTTPServer(appLogger,cfg)
 
-	log.Println("===================================")
-	log.Println("Village API Starting")
-	log.Println("Environment :", cfg.Environment)
-	log.Println("Port        :", cfg.Port)
-	log.Println("===================================")
+    appLogger.Info("========================================")
+
+    appLogger.Info(
+		"Village API starting",
+    	"environment", cfg.Environment,
+    	"port", cfg.Port,
+    )
+
+    appLogger.Info("========================================")
 
 	go func() {
 
@@ -32,14 +38,21 @@ func main() {
 		}
 	}()
 
-	log.Println("Server started successfully.")
+    appLogger.Info("========================================")
+	appLogger.Info(
+    	"server started successfully",
+    	"startup_ms",
+    	server.Uptime(),
+    )
+    appLogger.Info("========================================")
+
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	<-stop
-	log.Println("Shutdown signal received.")
-    log.Println("Total upTime: ", server.Uptime())
+	appLogger.Info("shutdown signal received")
+    appLogger.Info("Total upTime: ", server.Uptime())
 
 
 	ctx, cancel := context.WithTimeout(
@@ -53,5 +66,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Server shutdown complete.")
+	appLogger.Info("server shutdown complete")
 }

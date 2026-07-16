@@ -12,6 +12,7 @@ type Config struct {
 	Port            string
 	Environment     string
 	LogLevel        string
+	LogFormat       string
 	ReadTimeout     time.Duration
 	WriteTimeout    time.Duration
 	IdleTimeout     time.Duration
@@ -25,6 +26,7 @@ func Load() Config {
 		Port:            getEnv("PORT", "8080"),
 		Environment:     getEnv("ENVIRONMENT", "development"),
 		LogLevel:        getEnv("LOG_LEVEL", "info"),
+		LogFormat:       getEnv("LOG_FORMAT", "text"),
 		ReadTimeout:     getDuration("READ_TIMEOUT", 10),
 		WriteTimeout:    getDuration("WRITE_TIMEOUT", 10),
 		IdleTimeout:     getDuration("IDLE_TIMEOUT", 60),
