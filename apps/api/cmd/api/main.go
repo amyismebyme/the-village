@@ -1,70 +1,15 @@
 package main
-//main class that go uses to execute application. Everything branches off from here
-import (
-	"context"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/amyismebyme/the-village/apps/api/internal/config"
-	"github.com/amyismebyme/the-village/apps/api/internal/server"
-	"github.com/amyismebyme/the-village/apps/api/internal/logger"
+import (
+	"log"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/app"
 )
 
 func main() {
 
-    cfg := config.Load()
-    appLogger := logger.New(cfg)
-
-	httpServer := server.NewHTTPServer(appLogger,cfg)
-
-    appLogger.Info("========================================")
-
-    appLogger.Info(
-		"Village API starting",
-    	"environment", cfg.Environment,
-    	"port", cfg.Port,
-    )
-
-    appLogger.Info("========================================")
-
-	go func() {
-
-		if err := httpServer.ListenAndServe(); err != nil &&
-			err != http.ErrServerClosed {
-			log.Fatal(err)
-		}
-	}()
-
-    appLogger.Info("========================================")
-	appLogger.Info(
-    	"server started successfully",
-    	"startup_ms",
-    	server.Uptime(),
-    )
-    appLogger.Info("========================================")
-
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
-	<-stop
-	appLogger.Info("shutdown signal received")
-    appLogger.Info("Total upTime: ", server.Uptime())
-
-
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		cfg.ShutdownTimeout,
-	)
-
-	defer cancel()
-
-	if err := httpServer.Shutdown(ctx); err != nil {
+	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
 
-	appLogger.Info("server shutdown complete")
 }
