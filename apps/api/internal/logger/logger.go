@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 )
 
