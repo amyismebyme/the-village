@@ -1,7 +1,7 @@
 package middleware
 //Logging of requests and all the details
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -17,7 +17,7 @@ func (r *responseRecorder) WriteHeader(status int) {
 	r.ResponseWriter.WriteHeader(status)
 }
 
-func Logging(next http.Handler) http.Handler {
+func Logging(appLogger *slog.Logger, next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -31,13 +31,13 @@ func Logging(next http.Handler) http.Handler {
 		next.ServeHTTP(recorder, r)
 		duration := time.Since(start)
 
-		log.Printf(
-			"%s %s %d %v request_id=%s",
-			r.Method,
-			r.URL.Path,
-			recorder.status,
-			duration,
-			GetRequestID(r.Context()),
-		)
+		appLogger.Info(
+        	"request completed",
+        	"request_id", GetRequestID(r.Context()),
+        	"method", r.Method,
+        	"path", r.URL.Path,
+        	"status", recorder.status,
+        	"duration_ms", duration.Milliseconds(),
+        )
 	})
 }
