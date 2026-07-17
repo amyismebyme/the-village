@@ -1,4 +1,5 @@
 package middleware
+
 // How to recover and save the application in case of any issues.and
 // Acts as a buffer
 import (
@@ -28,12 +29,12 @@ func Recovery(appLogger *slog.Logger, next http.Handler) http.Handler {
 				}
 
 				appLogger.Error(
-                	"panic recovered",
-                	"request_id", requestID,
-                	"method", r.Method,
-                	"path", r.URL.Path,
-                	"error", err,
-                )
+					"panic recovered",
+					"request_id", requestID,
+					"method", r.Method,
+					"path", r.URL.Path,
+					"error", err,
+				)
 
 				http.Error(
 					w,

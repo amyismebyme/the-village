@@ -1,4 +1,5 @@
 package middleware
+
 //Logging of requests and all the details
 import (
 	"log/slog"
@@ -25,19 +26,19 @@ func Logging(appLogger *slog.Logger, next http.Handler) http.Handler {
 
 		recorder := &responseRecorder{
 			ResponseWriter: w,
-			status: http.StatusOK,
+			status:         http.StatusOK,
 		}
 
 		next.ServeHTTP(recorder, r)
 		duration := time.Since(start)
 
 		appLogger.Info(
-        	"request completed",
-        	"request_id", GetRequestID(r.Context()),
-        	"method", r.Method,
-        	"path", r.URL.Path,
-        	"status", recorder.status,
-        	"duration_ms", duration.Milliseconds(),
-        )
+			"request completed",
+			"request_id", GetRequestID(r.Context()),
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", recorder.status,
+			"duration_ms", duration.Milliseconds(),
+		)
 	})
 }

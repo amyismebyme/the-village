@@ -1,10 +1,11 @@
 package server
+
 // Route the different events based on handlers
 import (
-	"net/http"
-    "log/slog"
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
+	"log/slog"
+	"net/http"
 )
 
 func NewRouter(appLogger *slog.Logger) http.Handler {
@@ -17,11 +18,11 @@ func NewRouter(appLogger *slog.Logger) http.Handler {
 	mux.HandleFunc("/version", handlers.VersionHandler)
 
 	handler := middleware.Recovery(
-    	appLogger,
-    	middleware.RequestID(
-    		middleware.Logging(appLogger, mux),
-    	),
-    )
+		appLogger,
+		middleware.RequestID(
+			middleware.Logging(appLogger, mux),
+		),
+	)
 
 	return handler
 }

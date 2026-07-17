@@ -1,10 +1,10 @@
 package logger
 
 import (
+	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"log/slog"
 	"os"
 	"strings"
-	"github.com/amyismebyme/the-village/apps/api/internal/config"
 )
 
 func New(cfg config.Config) *slog.Logger {
