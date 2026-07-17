@@ -1,4 +1,5 @@
 package config
+
 // Package config manages application configuration.
 // Manages different params like ports and timeouts and log settings
 import (

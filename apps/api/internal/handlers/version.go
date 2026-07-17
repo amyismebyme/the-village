@@ -1,4 +1,5 @@
 package handlers
+
 //Version Handler for the app
 import (
 	"encoding/json"

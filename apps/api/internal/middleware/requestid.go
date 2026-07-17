@@ -1,4 +1,5 @@
 package middleware
+
 // Use google uuid to generate requestID for each request to the app
 import (
 	"context"
