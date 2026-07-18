@@ -3,21 +3,22 @@ package handlers
 //Version Handler for the app
 import (
 	"encoding/json"
+	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"net/http"
 )
 
 type VersionResponse struct {
 	Version   string `json:"version"`
-	Commit    string `json:"commit"`
+	GitCommit string `json:"GitCommit"`
 	BuildDate string `json:"buildDate"`
 }
 
 func VersionHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := VersionResponse{
-		Version:   "0.1.2",
-		Commit:    "dev",
-		BuildDate: "2026-07-13T00:00:00Z",
+		Version:   appruntime.BuildVersion,
+		GitCommit: appruntime.GitCommit,
+		BuildDate: appruntime.BuildTime.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

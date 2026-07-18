@@ -10,12 +10,17 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
+	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
 )
 
 func Run() error {
 
 	cfg := config.Load()
+	//The service refuses to start with invalid configuration.
+	if err := config.Validate(cfg); err != nil {
+		return err
+	}
 	appLogger := logger.New(cfg)
 
 	httpServer := server.NewHTTPServer(appLogger, cfg)
@@ -23,6 +28,8 @@ func Run() error {
 	appLogger.Info("========================================")
 	appLogger.Info(
 		"Village API starting",
+		"version", appruntime.BuildVersion,
+		"go_version", appruntime.GoVersion(),
 		"environment", cfg.Environment,
 		"port", cfg.Port,
 	)
@@ -39,7 +46,7 @@ func Run() error {
 	appLogger.Info(
 		"server started successfully",
 		"startup_ms",
-		server.Uptime(),
+		appruntime.Uptime(),
 	)
 
 	stop := make(chan os.Signal, 1)
@@ -47,7 +54,7 @@ func Run() error {
 
 	<-stop
 	appLogger.Info("shutdown signal received")
-	appLogger.Info("Total upTime: ", server.Uptime())
+	appLogger.Info("Total upTime: ", appruntime.Uptime())
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
