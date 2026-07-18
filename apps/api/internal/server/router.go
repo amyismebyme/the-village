@@ -16,6 +16,7 @@ func NewRouter(appLogger *slog.Logger) http.Handler {
 	mux.HandleFunc("/health", handlers.HealthHandler)
 	mux.HandleFunc("/ready", handlers.ReadyHandler)
 	mux.HandleFunc("/version", handlers.VersionHandler)
+	mux.HandleFunc("/status", handlers.StatusHandler)
 
 	handler := middleware.Recovery(
 		appLogger,
