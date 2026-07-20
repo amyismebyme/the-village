@@ -10,17 +10,19 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
 )
 
 func Run() error {
-
+    metrics.Register()
 	cfg := config.Load()
 	//The service refuses to start with invalid configuration.
 	if err := config.Validate(cfg); err != nil {
 		return err
 	}
+
 	appLogger := logger.New(cfg)
 
 	httpServer := server.NewHTTPServer(appLogger, cfg)
@@ -48,7 +50,6 @@ func Run() error {
 		"startup_ms",
 		appruntime.Uptime(),
 	)
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
