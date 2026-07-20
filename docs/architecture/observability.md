@@ -29,6 +29,8 @@ Router
 
 - Structured JSON logging
 - OpenTelemetry tracing
-- Prometheus metrics
 - Grafana dashboards
 - Distributed tracing
+
+## Started Adding Prometheus entries in Sprint 2
+Added custom metric for version 
