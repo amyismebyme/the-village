@@ -55,8 +55,7 @@ func Run() error {
 
 	<-stop
 	appLogger.Info("shutdown signal received")
-	appLogger.Info("Total upTime: ", appruntime.Uptime())
-
+    appLogger.Info("Application started","uptime", appruntime.Uptime(),)
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		cfg.ShutdownTimeout,
