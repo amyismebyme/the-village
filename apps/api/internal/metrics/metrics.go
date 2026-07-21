@@ -1,10 +1,11 @@
 package metrics
 
-import(
-"runtime"
-appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
-"github.com/prometheus/client_golang/prometheus"
+import (
+	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
+	"github.com/prometheus/client_golang/prometheus"
+	"runtime"
 )
+
 var RequestsTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "village_http_requests_total",
@@ -17,6 +18,17 @@ var RequestsTotal = prometheus.NewCounterVec(
 	},
 )
 
+var RequestDuration = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "village_http_request_duration_seconds",
+		Help:    "HTTP request latency.",
+		Buckets: prometheus.DefBuckets,
+	},
+	[]string{
+		"method",
+		"path",
+	},
+)
 
 var BuildInfo = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -28,18 +40,6 @@ var BuildInfo = prometheus.NewGaugeVec(
 		"git_commit",
 		"go_version",
 		"environment",
-	},
-)
-
-var RequestDuration = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "village_http_request_duration_seconds",
-		Help:    "HTTP request latency.",
-		Buckets: prometheus.DefBuckets,
-	},
-	[]string{
-		"method",
-		"path",
 	},
 )
 

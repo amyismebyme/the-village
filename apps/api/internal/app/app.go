@@ -16,7 +16,7 @@ import (
 )
 
 func Run() error {
-    metrics.Register()
+
 	cfg := config.Load()
 	//The service refuses to start with invalid configuration.
 	if err := config.Validate(cfg); err != nil {
@@ -24,7 +24,7 @@ func Run() error {
 	}
 
 	appLogger := logger.New(cfg)
-
+	metrics.Register()
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
 	appLogger.Info("========================================")
