@@ -4,6 +4,7 @@ import (
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/prometheus/client_golang/prometheus"
 	"runtime"
+	"sync"
 )
 
 var RequestsTotal = prometheus.NewCounterVec(
@@ -43,18 +44,21 @@ var BuildInfo = prometheus.NewGaugeVec(
 	},
 )
 
+var registerOnce sync.Once
+
 func Register() {
+	registerOnce.Do(func() {
+		prometheus.MustRegister(
+			RequestsTotal,
+			RequestDuration,
+			BuildInfo,
+		)
 
-	prometheus.MustRegister(
-		RequestsTotal,
-		RequestDuration,
-		BuildInfo,
-	)
-	BuildInfo.WithLabelValues(
-		appruntime.BuildVersion,
-		appruntime.GitCommit,
-		runtime.Version(),
-		appruntime.Environment,
-	).Set(1)
-
+		BuildInfo.WithLabelValues(
+			appruntime.BuildVersion,
+			appruntime.GitCommit,
+			runtime.Version(),
+			appruntime.Environment,
+		).Set(1)
+	})
 }
