@@ -1,12 +1,12 @@
 package testutil
 
 import (
-	"net/http"
 	"log/slog"
+	"net/http"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
 )
 
 func NewRouter(appLogger *slog.Logger) http.Handler {
-    return server.NewRouter(appLogger)
+	return server.NewRouter(appLogger)
 }
