@@ -1,0 +1,12 @@
+.git
+.github
+
+bin/
+
+docs/
+
+*.log
+
+.env
+
+coverage.out
