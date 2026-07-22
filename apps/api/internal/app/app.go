@@ -34,6 +34,7 @@ func Run() error {
 		"go_version", appruntime.GoVersion(),
 		"environment", cfg.Environment,
 		"port", cfg.Port,
+		"pid", os.Getpid(),
 	)
 	appLogger.Info("========================================")
 

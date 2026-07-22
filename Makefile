@@ -39,3 +39,13 @@ lint:
 .PHONY: clean
 clean:
 	rm -rf bin
+
+
+docker-build:
+	docker build -t village-api .
+
+docker-run:
+	docker run -p 8080:8080 village-api
+
+docker-compose:
+	docker compose up
