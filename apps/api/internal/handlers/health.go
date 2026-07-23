@@ -3,6 +3,7 @@ package handlers
 //Health handler for the app
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
@@ -23,6 +24,7 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewEncoder(w).Encode(response)
 
 	if err != nil {
+		log.Printf("failed to encode Root response: %v", err)
 		http.Error(
 			w,
 			"failed to encode health response",
