@@ -35,6 +35,9 @@ jobs:
             ~/.cache/go-build
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
+      - name: Lint (golangci-lint)
+        run: golangci-lint run
+
       - name: Download Dependencies
         run: go mod download
 
