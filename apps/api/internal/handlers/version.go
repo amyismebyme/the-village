@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"net/http"
+	"log"
 )
 
 type VersionResponse struct {
@@ -28,6 +29,7 @@ func VersionHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewEncoder(w).Encode(response)
 
 	if err != nil {
+		log.Printf("failed to encode Root response: %v", err)
 		http.Error(
 			w,
 			"failed to encode Version response",
