@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+
+  - job_name: village-api
+
+    metrics_path: /metrics
+
+    static_configs:
+
+      - targets:
+          - village-api:8080

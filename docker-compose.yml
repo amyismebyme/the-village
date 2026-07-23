@@ -13,3 +13,31 @@ services:
       PORT: 8080
       ENVIRONMENT: development
       LOG_LEVEL: info
+
+  prometheus:
+
+    image: prom/prometheus
+
+    container_name: prometheus
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+    depends_on:
+      - village-api
+
+
+  grafana:
+
+    image: grafana/grafana
+
+    container_name: grafana
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      - prometheus
