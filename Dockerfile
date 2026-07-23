@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -o village-api ./cmd/api
 
 # ---------- Runtime Stage ----------
-FROM alpine:latest
+FROM alpine:3.18.6
 
 RUN addgroup -S village && \
     adduser -S village -G village
@@ -30,8 +30,7 @@ USER village
 
 EXPOSE 8080
 
-ENTRYPOINT ["./village-api"]
-
-
 HEALTHCHECK --interval=30s --timeout=5s \
 CMD wget --spider http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["./village-api"]
