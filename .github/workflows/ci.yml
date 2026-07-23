@@ -35,8 +35,11 @@ jobs:
             ~/.cache/go-build
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
-      - name: Lint (golangci-lint)
-        run: golangci-lint run
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: apps/api
 
       - name: Download Dependencies
         run: go mod download
