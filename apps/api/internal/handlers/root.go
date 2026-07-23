@@ -4,8 +4,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
 	"log"
+	"net/http"
 )
 
 type RootResponse struct {

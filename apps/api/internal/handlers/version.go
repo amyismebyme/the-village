@@ -4,8 +4,8 @@ package handlers
 import (
 	"encoding/json"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
-	"net/http"
 	"log"
+	"net/http"
 )
 
 type VersionResponse struct {

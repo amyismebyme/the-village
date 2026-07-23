@@ -3,8 +3,8 @@ package handlers
 //Health handler for the app
 import (
 	"encoding/json"
-	"net/http"
 	"log"
+	"net/http"
 )
 
 type HealthResponse struct {
