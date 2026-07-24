@@ -1,9 +1,13 @@
 package testutil
 
-import "net/http/httptest"
+import (
+	"io"
+	"log/slog"
+)
 
-func NewRecorder() *httptest.ResponseRecorder {
-
-	return httptest.NewRecorder()
-
+// NewDiscardLogger returns a logger that discards all output.
+func NewDiscardLogger() *slog.Logger {
+	return slog.New(
+		slog.NewTextHandler(io.Discard, nil),
+	)
 }

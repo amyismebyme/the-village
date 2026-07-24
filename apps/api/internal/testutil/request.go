@@ -5,15 +5,7 @@ import (
 	"net/http/httptest"
 )
 
-func NewRequest(
-	method string,
-	path string,
-) *http.Request {
-
-	return httptest.NewRequest(
-		method,
-		path,
-		nil,
-	)
-
+// NewRequest creates an HTTP request for tests.
+func NewRequest(method, path string) *http.Request {
+	return httptest.NewRequest(method, path, nil)
 }

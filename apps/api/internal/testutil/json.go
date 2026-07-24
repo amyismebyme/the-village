@@ -3,31 +3,13 @@ package testutil
 import (
 	"encoding/json"
 	"testing"
-
-	"net/http/httptest"
 )
 
-func DecodeJSON[T any](
-	t *testing.T,
-	rec *httptest.ResponseRecorder,
-) T {
-
+// DecodeJSON decodes a JSON response into the provided destination.
+func DecodeJSON[T any](t *testing.T, data []byte, dst *T) {
 	t.Helper()
 
-	var response T
-
-	if err := json.Unmarshal(
-		rec.Body.Bytes(),
-		&response,
-	); err != nil {
-
-		t.Fatalf(
-			"unable to decode JSON: %v",
-			err,
-		)
-
+	if err := json.Unmarshal(data, dst); err != nil {
+		t.Fatalf("failed to decode JSON: %v", err)
 	}
-
-	return response
-
 }
