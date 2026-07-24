@@ -1,9 +1,7 @@
 version: "3.9"
 
 services:
-
   village-api:
-
     build: .
 
     ports:
@@ -14,8 +12,10 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: info
 
-  prometheus:
+    depends_on:
+      - postgres
 
+  prometheus:
     image: prom/prometheus
 
     container_name: prometheus
@@ -29,9 +29,7 @@ services:
     depends_on:
       - village-api
 
-
   grafana:
-
     image: grafana/grafana
 
     container_name: grafana
@@ -41,3 +39,23 @@ services:
 
     depends_on:
       - prometheus
+
+  postgres:
+    image: postgres:17
+
+    container_name: village-postgres
+
+    environment:
+      POSTGRES_DB: village
+      POSTGRES_USER: village
+      POSTGRES_PASSWORD: village
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres-data:
