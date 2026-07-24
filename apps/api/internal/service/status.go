@@ -1,13 +1,12 @@
 package service
 
 import (
-	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 )
 
 type StatusHandler struct {
-	service *service.StatusService
+	service *StatusService
 }
 
 func NewStatusHandler(
