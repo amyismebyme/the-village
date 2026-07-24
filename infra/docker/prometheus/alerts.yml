@@ -1,0 +1,44 @@
+groups:
+
+  - name: village-alerts
+
+    rules:
+
+      - alert: VillageAPIUnavailable
+
+        expr: up{job="village-api"} == 0
+
+        for: 30s
+
+        labels:
+          severity: critical
+
+        annotations:
+          summary: Village API is down
+          description: Prometheus cannot scrape the Village API.
+
+      - alert: HighRequestLatency
+
+        expr: village:http_request_duration:p95 > 0.5
+
+        for: 2m
+
+        labels:
+          severity: warning
+
+        annotations:
+          summary: High request latency
+          description: P95 latency exceeded 500ms.
+
+      - alert: HighServerErrorRate
+
+        expr: village:http_errors:rate5m > 1
+
+        for: 2m
+
+        labels:
+          severity: warning
+
+        annotations:
+          summary: Elevated HTTP 5xx errors
+          description: Error rate exceeds threshold.
