@@ -1,0 +1,23 @@
+groups:
+
+  - name: village-recording-rules
+
+    interval: 15s
+
+    rules:
+
+      - record: village:http_requests:rate5m
+        expr: |
+          rate(village_http_requests_total[5m])
+
+      - record: village:http_errors:rate5m
+        expr: |
+          rate(village_http_requests_total{status=~"5.."}[5m])
+
+      - record: village:http_request_duration:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(village_http_request_duration_seconds_bucket[5m]))
+            by (le)
+          )
