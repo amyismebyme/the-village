@@ -22,3 +22,7 @@ func Uptime() time.Duration {
 func GoVersion() string {
 	return runtime.Version()
 }
+
+func Build() string {
+	return BuildVersion
+}
