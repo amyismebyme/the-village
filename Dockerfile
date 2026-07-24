@@ -7,9 +7,9 @@ COPY apps/api/go.mod .
 COPY apps/api/go.sum .
 
 #only needed to bypass the prpxy on laptop
-COPY zscaler.crt /usr/local/share/ca-certificates/
-RUN update-ca-certificates
-RUN go mod download
+#COPY zscaler.crt /usr/local/share/ca-certificates/
+#RUN update-ca-certificates
+#RUN go mod download
 
 COPY apps/api .
 
