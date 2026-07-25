@@ -7,17 +7,6 @@ import (
 	"time"
 )
 
-type responseRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *responseRecorder) WriteHeader(status int) {
-
-	r.status = status
-	r.ResponseWriter.WriteHeader(status)
-}
-
 func Logging(appLogger *slog.Logger, next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
