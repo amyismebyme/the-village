@@ -57,7 +57,7 @@ func (r *ResourceRepository) Create(
 
 	// TODO:
 	// Insert resource after schema exists.
-	return fmt.Errorf("resource repository: Create not implemented")
+	return repository.ErrNotImplemented
 }
 
 func (r *ResourceRepository) Update(
@@ -70,7 +70,7 @@ func (r *ResourceRepository) Update(
 
 	// TODO:
 	// Update resource after schema exists.
-	return fmt.Errorf("resource repository: Update not implemented")
+	return repository.ErrNotImplemented
 }
 
 func (r *ResourceRepository) Delete(
@@ -83,5 +83,5 @@ func (r *ResourceRepository) Delete(
 
 	// TODO:
 	// Delete resource after schema exists.
-	return fmt.Errorf("resource repository: Delete not implemented")
+	return repository.ErrNotImplemented
 }
