@@ -24,7 +24,7 @@ func Run() error {
 	}
 
 	appLogger := logger.New(cfg)
-	metrics.Register()
+	metrics.Register(nil)
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
 	appLogger.Info("========================================")

@@ -106,7 +106,7 @@ var BuildInfo = prometheus.NewGaugeVec(
 
 var registerOnce sync.Once
 
-func Register() {
+func Register(reg prometheus.Registerer) {
 	registerOnce.Do(func() {
 		prometheus.MustRegister(
 			RequestsTotal,
