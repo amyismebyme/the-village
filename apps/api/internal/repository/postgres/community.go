@@ -57,7 +57,7 @@ func (r *CommunityRepository) Create(
 
 	// TODO:
 	// Insert community after schema exists.
-	return fmt.Errorf("community repository: Create not implemented")
+	return repository.ErrNotImplemented
 }
 
 func (r *CommunityRepository) Update(
@@ -70,7 +70,7 @@ func (r *CommunityRepository) Update(
 
 	// TODO:
 	// Update community after schema exists.
-	return fmt.Errorf("community repository: Update not implemented")
+	return repository.ErrNotImplemented
 }
 
 func (r *CommunityRepository) Delete(
@@ -83,5 +83,5 @@ func (r *CommunityRepository) Delete(
 
 	// TODO:
 	// Delete community after schema exists.
-	return fmt.Errorf("community repository: Delete not implemented")
+	return repository.ErrNotImplemented
 }
