@@ -9,12 +9,11 @@ import (
 	"syscall"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
+	"github.com/amyismebyme/the-village/apps/api/internal/database"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
-    "github.com/amyismebyme/the-village/apps/api/internal/database"
-
 )
 
 func Run() error {
@@ -37,7 +36,7 @@ func Run() error {
 	metrics.Register(nil)
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
-	appLogger.Info("========================================")
+	appLogger.Info("=========================================")
 	appLogger.Info(
 		"Village API starting",
 		"version", appruntime.BuildVersion,
@@ -46,7 +45,7 @@ func Run() error {
 		"port", cfg.Port,
 		"pid", os.Getpid(),
 	)
-	appLogger.Info("========================================")
+	appLogger.Info("=========================================")
 
 	go func() {
 
@@ -79,7 +78,7 @@ func Run() error {
 		log.Fatal(err)
 	}
 	db.Close()
-	appLogger.Info("server shutdown complete")
+	appLogger.Info("Server shutdown complete")
 
 	return nil
 }

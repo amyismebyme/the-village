@@ -3,6 +3,7 @@ package database
 import "context"
 
 const CheckerName = "database"
+
 type HealthProvider interface {
 	Health(context.Context) error
 }
