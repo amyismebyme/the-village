@@ -13,6 +13,8 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
+    "github.com/amyismebyme/the-village/apps/api/internal/database"
+
 )
 
 func Run() error {
@@ -24,6 +26,14 @@ func Run() error {
 	}
 
 	appLogger := logger.New(cfg)
+
+	ctx := context.Background()
+
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return err
+	}
+
 	metrics.Register(nil)
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
@@ -56,6 +66,7 @@ func Run() error {
 
 	<-stop
 	appLogger.Info("shutdown signal received")
+
 	appLogger.Info("Application started--", "uptime", appruntime.Uptime())
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -67,7 +78,7 @@ func Run() error {
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Fatal(err)
 	}
-
+	db.Close()
 	appLogger.Info("server shutdown complete")
 
 	return nil
