@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
+	"github.com/amyismebyme/the-village/apps/api/internal/database"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
@@ -24,10 +25,18 @@ func Run() error {
 	}
 
 	appLogger := logger.New(cfg)
+
+	ctx := context.Background()
+
+	db, err := database.Open(ctx, cfg.Database)
+	if err != nil {
+		return err
+	}
+
 	metrics.Register(nil)
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
-	appLogger.Info("========================================")
+	appLogger.Info("=========================================")
 	appLogger.Info(
 		"Village API starting",
 		"version", appruntime.BuildVersion,
@@ -36,7 +45,7 @@ func Run() error {
 		"port", cfg.Port,
 		"pid", os.Getpid(),
 	)
-	appLogger.Info("========================================")
+	appLogger.Info("=========================================")
 
 	go func() {
 
@@ -56,6 +65,7 @@ func Run() error {
 
 	<-stop
 	appLogger.Info("shutdown signal received")
+
 	appLogger.Info("Application started--", "uptime", appruntime.Uptime())
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -67,8 +77,8 @@ func Run() error {
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Fatal(err)
 	}
-
-	appLogger.Info("server shutdown complete")
+	db.Close()
+	appLogger.Info("Server shutdown complete")
 
 	return nil
 }
