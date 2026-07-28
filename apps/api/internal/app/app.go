@@ -37,7 +37,7 @@ func Run() error {
 	metrics.Register(nil)
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
-	appLogger.Info("========================================")
+	appLogger.Info("=======================================")
 	appLogger.Info(
 		"Village API starting",
 		"version", appruntime.BuildVersion,
@@ -46,7 +46,7 @@ func Run() error {
 		"port", cfg.Port,
 		"pid", os.Getpid(),
 	)
-	appLogger.Info("========================================")
+	appLogger.Info("=======================================")
 
 	go func() {
 
