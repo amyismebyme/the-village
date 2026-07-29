@@ -17,6 +17,7 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 
 	Register(registry, nil)
 }
+
 /*
 func TestBuildInfoMetricRegistered(t *testing.T) {
 	registry := prometheus.NewRegistry()
