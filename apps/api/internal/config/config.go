@@ -36,7 +36,7 @@ func Load() Config {
 		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 15),
 
 		Database: database.Config{
-			Host: getEnv("DB_HOST", "localhost"),
+			Host: getEnv("DB_HOST", "postgres"),
 			Port: getInt("DB_PORT", 5432),
 
 			User:     getEnv("DB_USER", "village"),

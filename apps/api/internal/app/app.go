@@ -14,6 +14,7 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func Run() error {
@@ -32,8 +33,16 @@ func Run() error {
 	if err != nil {
 		return err
 	}
+	stats := db.Stats()
 
-	metrics.Register(nil)
+	appLogger.Info(
+		"database connection pool initialized",
+		"max_connections", stats.MaxConnections,
+		"total_connections", stats.TotalConnections,
+		"idle_connections", stats.IdleConnections,
+	)
+
+	metrics.Register(prometheus.DefaultRegisterer, db.Pool())
 	httpServer := server.NewHTTPServer(appLogger, cfg)
 
 	appLogger.Info("=========================================")
