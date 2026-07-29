@@ -115,6 +115,11 @@ type PoolCollector struct {
 	idle     *prometheus.Desc
 	total    *prometheus.Desc
 	max      *prometheus.Desc
+
+	acquireCount      *prometheus.Desc
+	acquireDuration   *prometheus.Desc
+	emptyAcquireCount *prometheus.Desc
+	constructing      *prometheus.Desc
 }
 
 func NewPoolCollector(pool *pgxpool.Pool) *PoolCollector {
@@ -142,6 +147,34 @@ func NewPoolCollector(pool *pgxpool.Pool) *PoolCollector {
 			nil,
 		),
 
+		acquireCount: prometheus.NewDesc(
+			"village_db_pool_acquire_total",
+			"Total successful connection acquisitions.",
+			nil,
+			nil,
+		),
+
+		acquireDuration: prometheus.NewDesc(
+			"village_db_pool_acquire_duration_ms_total",
+			"Total acquisition wait time in milliseconds.",
+			nil,
+			nil,
+		),
+
+		emptyAcquireCount: prometheus.NewDesc(
+			"village_db_pool_empty_acquire_total",
+			"Number of waits caused by exhausted pool.",
+			nil,
+			nil,
+		),
+
+		constructing: prometheus.NewDesc(
+			"village_db_pool_constructing_connections",
+			"Connections currently being established.",
+			nil,
+			nil,
+		),
+
 		max: prometheus.NewDesc(
 			"village_db_pool_max_connections",
 			"Configured maximum connections.",
@@ -156,6 +189,11 @@ func (c *PoolCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.idle
 	ch <- c.total
 	ch <- c.max
+
+	ch <- c.acquireCount
+	ch <- c.acquireDuration
+	ch <- c.emptyAcquireCount
+	ch <- c.constructing
 }
 
 func (c *PoolCollector) Collect(ch chan<- prometheus.Metric) {
@@ -177,6 +215,30 @@ func (c *PoolCollector) Collect(ch chan<- prometheus.Metric) {
 		c.total,
 		prometheus.GaugeValue,
 		float64(s.TotalConns()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.acquireCount,
+		prometheus.CounterValue,
+		float64(s.AcquireCount()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.acquireDuration,
+		prometheus.CounterValue,
+		float64(s.AcquireDuration().Milliseconds()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.emptyAcquireCount,
+		prometheus.CounterValue,
+		float64(s.EmptyAcquireCount()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.constructing,
+		prometheus.GaugeValue,
+		float64(s.ConstructingConns()),
 	)
 
 	ch <- prometheus.MustNewConstMetric(
