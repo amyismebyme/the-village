@@ -55,5 +55,29 @@ func (c Config) Validate() error {
 		return fmt.Errorf("database name is required")
 	}
 
+	if c.MaxConns <= 0 {
+		return fmt.Errorf("database max connections must be greater than zero")
+	}
+
+	if c.MinConns < 0 {
+		return fmt.Errorf("database min connections cannot be negative")
+	}
+
+	if c.MinConns > c.MaxConns {
+		return fmt.Errorf("database min connections cannot exceed max connections")
+	}
+
+	if c.MaxConnLifetime <= 0 {
+		return fmt.Errorf("database max connection lifetime must be greater than zero")
+	}
+
+	if c.MaxConnIdleTime <= 0 {
+		return fmt.Errorf("database max idle time must be greater than zero")
+	}
+
+	if c.HealthCheckPeriod <= 0 {
+		return fmt.Errorf("database health check period must be greater than zero")
+	}
+
 	return nil
 }

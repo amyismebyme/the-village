@@ -7,7 +7,6 @@ import (
 )
 
 func TestRegisterDoesNotPanic(t *testing.T) {
-
 	registry := prometheus.NewRegistry()
 
 	defer func() {
@@ -16,18 +15,16 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 		}
 	}()
 
-	Register(registry)
+	Register(registry, nil)
 }
 
 /*
 func TestBuildInfoMetricRegistered(t *testing.T) {
-
 	registry := prometheus.NewRegistry()
 
-	Register(registry)
+	Register(registry, nil)
 
 	metrics, err := registry.Gather()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +32,6 @@ func TestBuildInfoMetricRegistered(t *testing.T) {
 	found := false
 
 	for _, metric := range metrics {
-
 		if metric.GetName() == "village_build_info" {
 			found = true
 			break
@@ -46,22 +42,18 @@ func TestBuildInfoMetricRegistered(t *testing.T) {
 		t.Fatal("village_build_info not registered")
 	}
 }
-*/
-/*
-func TestBuildInfoMetricValue(t *testing.T) {
 
+func TestBuildInfoMetricValue(t *testing.T) {
 	registry := prometheus.NewRegistry()
 
-	Register(registry)
+	Register(registry, nil)
 
 	metrics, err := registry.Gather()
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, metric := range metrics {
-
 		if metric.GetName() != "village_build_info" {
 			continue
 		}
@@ -73,11 +65,12 @@ func TestBuildInfoMetricValue(t *testing.T) {
 		value := metric.Metric[0].GetGauge().GetValue()
 
 		if value != 1 {
-			t.Fatalf("expected value 1 got %v", value)
+			t.Fatalf("expected value 1, got %v", value)
 		}
 
 		return
 	}
 
-	t.Fatal("build info metric missing")
-}*/
+	t.Fatal("village_build_info metric missing")
+}
+*/

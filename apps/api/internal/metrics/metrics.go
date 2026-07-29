@@ -5,45 +5,25 @@ import (
 	"sync"
 
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var RequestsTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "village_http_requests_total",
-		Help: "Total HTTP requests.",
+		Help: "Total HTTP requests..",
 	},
-	[]string{
-		"method",
-		"path",
-		"status",
-	},
+	[]string{"method", "path", "status"},
 )
 
 var RequestDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Name: "village_http_request_duration_seconds",
-		Help: "HTTP request latency.",
-		Buckets: []float64{
-			0.001,
-			0.0025,
-			0.005,
-			0.01,
-			0.025,
-			0.05,
-			0.1,
-			0.25,
-			0.5,
-			1,
-			2.5,
-			5,
-			10,
-		},
+		Name:    "village_http_request_duration_seconds",
+		Help:    "HTTP request latency.",
+		Buckets: []float64{0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 	},
-	[]string{
-		"method",
-		"path",
-	},
+	[]string{"method", "path"},
 )
 
 var RequestsInFlight = prometheus.NewGauge(
@@ -65,9 +45,7 @@ var ErrorsTotal = prometheus.NewCounterVec(
 		Name: "village_errors_total",
 		Help: "Total application errors.",
 	},
-	[]string{
-		"type",
-	},
+	[]string{"type"},
 )
 
 var DatabaseQueriesTotal = prometheus.NewCounterVec(
@@ -75,9 +53,7 @@ var DatabaseQueriesTotal = prometheus.NewCounterVec(
 		Name: "village_db_queries_total",
 		Help: "Total database queries.",
 	},
-	[]string{
-		"operation",
-	},
+	[]string{"operation"},
 )
 
 var DatabaseQueryDuration = prometheus.NewHistogramVec(
@@ -86,15 +62,13 @@ var DatabaseQueryDuration = prometheus.NewHistogramVec(
 		Help:    "Database query latency.",
 		Buckets: prometheus.DefBuckets,
 	},
-	[]string{
-		"operation",
-	},
+	[]string{"operation"},
 )
 
 var BuildInfo = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "village_build_info",
-		Help: "Build and runtime information for the running application.",
+		Help: "Build and runtime information.",
 	},
 	[]string{
 		"version",
@@ -106,9 +80,9 @@ var BuildInfo = prometheus.NewGaugeVec(
 
 var registerOnce sync.Once
 
-func Register(reg prometheus.Registerer) {
+func Register(reg prometheus.Registerer, pool *pgxpool.Pool) {
 	registerOnce.Do(func() {
-		prometheus.MustRegister(
+		collectors := []prometheus.Collector{
 			RequestsTotal,
 			RequestDuration,
 			RequestsInFlight,
@@ -117,11 +91,13 @@ func Register(reg prometheus.Registerer) {
 			DatabaseQueriesTotal,
 			DatabaseQueryDuration,
 			BuildInfo,
+		}
 
-			// Standard Go & process metrics.
-			//prometheus.NewGoCollector(),
-			//prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
-		)
+		if pool != nil {
+			collectors = append(collectors, NewPoolCollector(pool))
+		}
+
+		reg.MustRegister(collectors...)
 
 		BuildInfo.WithLabelValues(
 			appruntime.BuildVersion,
@@ -130,4 +106,82 @@ func Register(reg prometheus.Registerer) {
 			appruntime.Environment,
 		).Set(1)
 	})
+}
+
+type PoolCollector struct {
+	pool *pgxpool.Pool
+
+	acquired *prometheus.Desc
+	idle     *prometheus.Desc
+	total    *prometheus.Desc
+	max      *prometheus.Desc
+}
+
+func NewPoolCollector(pool *pgxpool.Pool) *PoolCollector {
+	return &PoolCollector{
+		pool: pool,
+
+		acquired: prometheus.NewDesc(
+			"village_db_pool_acquired_connections",
+			"Number of acquired connections.",
+			nil,
+			nil,
+		),
+
+		idle: prometheus.NewDesc(
+			"village_db_pool_idle_connections",
+			"Number of idle connections.",
+			nil,
+			nil,
+		),
+
+		total: prometheus.NewDesc(
+			"village_db_pool_total_connections",
+			"Total connections in the pool.",
+			nil,
+			nil,
+		),
+
+		max: prometheus.NewDesc(
+			"village_db_pool_max_connections",
+			"Configured maximum connections.",
+			nil,
+			nil,
+		),
+	}
+}
+
+func (c *PoolCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.acquired
+	ch <- c.idle
+	ch <- c.total
+	ch <- c.max
+}
+
+func (c *PoolCollector) Collect(ch chan<- prometheus.Metric) {
+	s := c.pool.Stat()
+
+	ch <- prometheus.MustNewConstMetric(
+		c.acquired,
+		prometheus.GaugeValue,
+		float64(s.AcquiredConns()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.idle,
+		prometheus.GaugeValue,
+		float64(s.IdleConns()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.total,
+		prometheus.GaugeValue,
+		float64(s.TotalConns()),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.max,
+		prometheus.GaugeValue,
+		float64(s.MaxConns()),
+	)
 }
