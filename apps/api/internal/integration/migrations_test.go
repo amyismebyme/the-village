@@ -18,7 +18,7 @@ func TestMigrationsApplied(t *testing.T) {
 	)
 	defer cancel()
 
-	t.Run("schema_migrations existS", func(t *testing.T) {
+	t.Run("schema_migrations exists", func(t *testing.T) {
 		assertTableExists(
 			t,
 			ctx,
