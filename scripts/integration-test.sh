@@ -12,7 +12,7 @@ MIGRATION_DIR="${REPO_ROOT}/migrations"
 
 echo ""
 echo "========================================="
-echo " Village Integration Test Runner"
+echo " Village Integration Test Runners"
 echo "========================================="
 echo ""
 
