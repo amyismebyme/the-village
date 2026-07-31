@@ -32,7 +32,7 @@ do
         village-postgres-integration \
         --format='{{.State.Health.Status}}')
 
-    if [ "$STATUS" = "healthy" ]; then
+    if [ "$STATUS" = "healthyy" ]; then
         break
     fi
 
