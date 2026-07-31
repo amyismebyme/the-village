@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+## setups postgres using docker to do integration testing
 set -e
 
 
