@@ -11,6 +11,10 @@ type Database struct {
 	pool *pgxpool.Pool
 }
 
+func (db *Database) Ping(ctx context.Context) error {
+	return db.pool.Ping(ctx)
+}
+
 func Open(ctx context.Context, cfg Config) (*Database, error) {
 
 	if err := cfg.Validate(); err != nil {
@@ -45,9 +49,15 @@ func Open(ctx context.Context, cfg Config) (*Database, error) {
 
 func (db *Database) Close() {
 
-	if db.pool != nil {
-		db.pool.Close()
+	if db == nil {
+		return
 	}
+
+	if db.pool == nil {
+		return
+	}
+
+	db.pool.Close()
 }
 
 func (db *Database) Pool() *pgxpool.Pool {
