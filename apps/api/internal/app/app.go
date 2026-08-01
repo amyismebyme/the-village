@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
+	"github.com/amyismebyme/the-village/apps/api/internal/health"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
@@ -18,21 +19,36 @@ import (
 )
 
 func Run() error {
-
 	cfg := config.Load()
-	//The service refuses to start with invalid configuration.
+
 	if err := config.Validate(cfg); err != nil {
-		return err
+		return fmt.Errorf("validate configuration: %w", err)
+	}
+
+	if err := cfg.Database.Validate(); err != nil {
+		return fmt.Errorf("database configuration: %w", err)
 	}
 
 	appLogger := logger.New(cfg)
 
-	ctx := context.Background()
+	startupCtx := context.Background()
 
-	db, err := database.Open(ctx, cfg.Database)
+	db, err := database.Open(startupCtx, cfg.Database)
 	if err != nil {
-		return err
+		return fmt.Errorf("open database: %w", err)
 	}
+
+	// Close the pool if startup fails after this point.
+	startupComplete := false
+	defer func() {
+		if !startupComplete {
+			db.Close()
+		}
+	}()
+
+	healthRegistry := health.NewRegistry()
+	healthRegistry.Register(database.NewHealthChecker(db))
+
 	stats := db.Stats()
 
 	appLogger.Info(
@@ -42,10 +58,17 @@ func Run() error {
 		"idle_connections", stats.IdleConnections,
 	)
 
-	metrics.Register(prometheus.DefaultRegisterer, db.Pool())
-	httpServer := server.NewHTTPServer(appLogger, cfg)
+	metrics.Register(
+		prometheus.DefaultRegisterer,
+		db.Pool(),
+	)
 
-	appLogger.Info("=========================================")
+	httpServer := server.NewHTTPServer(
+		appLogger,
+		cfg,
+		healthRegistry,
+	)
+
 	appLogger.Info(
 		"Village API starting",
 		"version", appruntime.BuildVersion,
@@ -54,40 +77,63 @@ func Run() error {
 		"port", cfg.Port,
 		"pid", os.Getpid(),
 	)
-	appLogger.Info("=========================================")
+
+	serverErrors := make(chan error, 1)
 
 	go func() {
+		err := httpServer.ListenAndServe()
 
-		if err := httpServer.ListenAndServe(); err != nil &&
-			err != http.ErrServerClosed {
-			log.Fatal(err)
+		if err != nil && err != http.ErrServerClosed {
+			serverErrors <- err
+			return
 		}
+
+		serverErrors <- nil
 	}()
 
 	appLogger.Info(
 		"server started successfully",
-		"startup_ms",
-		appruntime.Uptime(),
+		"startup_ms", appruntime.Uptime().Milliseconds(),
 	)
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stop)
 
-	<-stop
-	appLogger.Info("shutdown signal received")
+	startupComplete = true
 
-	appLogger.Info("Application started--", "uptime", appruntime.Uptime())
-	ctx, cancel := context.WithTimeout(
+	select {
+	case sig := <-stop:
+		appLogger.Info(
+			"shutdown signal received",
+			"signal", sig.String(),
+			"uptime", appruntime.Uptime().String(),
+		)
+
+	case err := <-serverErrors:
+		if err != nil {
+			db.Close()
+			return fmt.Errorf("HTTP server failed: %w", err)
+		}
+
+		db.Close()
+		return nil
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(
 		context.Background(),
 		cfg.ShutdownTimeout,
 	)
-
 	defer cancel()
 
-	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Fatal(err)
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		db.Close()
+		return fmt.Errorf("shutdown HTTP server: %w", err)
 	}
+
 	db.Close()
-	appLogger.Info("Server shutdown complete")
+
+	appLogger.Info("server shutdown complete")
 
 	return nil
 }

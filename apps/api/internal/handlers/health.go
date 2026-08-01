@@ -2,80 +2,66 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
 )
-
-var healthRegistry *health.Registry
-
-// SetHealthRegistry injects the application's health registry.
-func SetHealthRegistry(registry *health.Registry) {
-	healthRegistry = registry
-}
 
 type HealthResponse struct {
 	Status string            `json:"status"`
 	Checks map[string]string `json:"checks"`
 }
 
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
+// NewHealthHandler returns a health endpoint backed by the supplied registry.
+func NewHealthHandler(
+	appLogger *slog.Logger,
+	registry *health.Registry,
+) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := HealthResponse{
+			Status: "healthy",
+			Checks: make(map[string]string),
+		}
 
-	response := HealthResponse{
-		Status: "healthy",
-		Checks: make(map[string]string),
-	}
+		statusCode := http.StatusOK
 
-	// Registry not configured.
-	if healthRegistry == nil {
+		if registry == nil {
+			response.Status = "unhealthy"
+			response.Checks["registry"] = "unhealthy"
+			statusCode = http.StatusServiceUnavailable
+		} else {
+			for name, checkErr := range registry.Check(r.Context()) {
+				if checkErr != nil {
+					response.Status = "unhealthy"
+					response.Checks[name] = "unhealthy"
+					statusCode = http.StatusServiceUnavailable
 
-		response.Status = "unhealthy"
-		response.Checks["registry"] = "not configured"
+					if appLogger != nil {
+						appLogger.Warn(
+							"health check failed",
+							"check", name,
+							"error", checkErr,
+						)
+					}
+
+					continue
+				}
+
+				response.Checks[name] = "healthy"
+			}
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
+		w.WriteHeader(statusCode)
 
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("failed to encode health response: %v", err)
+			if appLogger != nil {
+				appLogger.Error(
+					"failed to encode health response",
+					"error", err,
+				)
+			}
 		}
-
-		return
-	}
-
-	results := healthRegistry.Check(r.Context())
-
-	for name, err := range results {
-
-		if err != nil {
-
-			response.Status = "unhealthy"
-			response.Checks[name] = err.Error()
-
-			continue
-		}
-
-		response.Checks[name] = "ok"
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	if response.Status == "healthy" {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-
-		log.Printf("failed to encode health response: %v", err)
-
-		http.Error(
-			w,
-			"failed to encode health response",
-			http.StatusInternalServerError,
-		)
-
-		return
-	}
+	})
 }

@@ -1,22 +1,65 @@
 package handlers
 
 import (
+	"context"
+	"io"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"github.com/amyismebyme/the-village/apps/api/internal/testutil"
+	"github.com/amyismebyme/the-village/apps/api/internal/health"
 )
+
+type benchmarkChecker struct{}
+
+func (benchmarkChecker) Name() string {
+	return "database"
+}
+
+func (benchmarkChecker) Check(context.Context) error {
+	return nil
+}
 
 func BenchmarkHealthHandler(b *testing.B) {
 
-	req := testutil.NewRequest(http.MethodGet, "/health")
+	logger := slog.New(
+		slog.NewTextHandler(io.Discard, nil),
+	)
 
-	b.ReportAllocs()
+	registry := health.NewRegistry()
 
-	for b.Loop() {
+	registry.Register(
+		benchmarkChecker{},
+	)
 
-		rr := testutil.NewRecorder()
+	handler := NewHealthHandler(
+		logger,
+		registry,
+	)
 
-		HealthHandler(rr, req)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/health",
+		nil,
+	)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(
+			rec,
+			req,
+		)
+
+		if rec.Code != http.StatusOK {
+			b.Fatalf(
+				"unexpected status %d",
+				rec.Code,
+			)
+		}
 	}
 }
