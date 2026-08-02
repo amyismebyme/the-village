@@ -85,3 +85,24 @@ func (r *CommunityRepository) Delete(
 	// Delete community after schema exists.
 	return repository.ErrNotImplemented
 }
+
+// DeleteAll removes every community and resets the identity sequence.
+//
+// This method is primarily intended for integration-test cleanup.
+func (r *CommunityRepository) DeleteAll(
+	ctx context.Context,
+) error {
+	const query = `
+TRUNCATE TABLE communities
+RESTART IDENTITY
+`
+
+	if _, err := r.pool.Exec(ctx, query); err != nil {
+		return fmt.Errorf(
+			"community repository: delete all communities: %w",
+			err,
+		)
+	}
+
+	return nil
+}

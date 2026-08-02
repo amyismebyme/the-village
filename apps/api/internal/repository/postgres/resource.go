@@ -85,3 +85,24 @@ func (r *ResourceRepository) Delete(
 	// Delete resource after schema exists.
 	return repository.ErrNotImplemented
 }
+
+// DeleteAll removes every resource and resets the identity sequence.
+//
+// This method is primarily intended for integration-test cleanup.
+func (r *ResourceRepository) DeleteAll(
+	ctx context.Context,
+) error {
+	const query = `
+TRUNCATE TABLE resources
+RESTART IDENTITY
+`
+
+	if _, err := r.pool.Exec(ctx, query); err != nil {
+		return fmt.Errorf(
+			"resource repository: delete all resources: %w",
+			err,
+		)
+	}
+
+	return nil
+}

@@ -1,77 +1,101 @@
 #!/usr/bin/env bash
-## setups postgres using docker to do integration testing
-set -e
 
+set -Eeuo pipefail
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_ROOT="$( cd "${SCRIPT_DIR}/.." && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 API_DIR="${REPO_ROOT}/apps/api"
 COMPOSE_FILE="${REPO_ROOT}/testdata/docker-compose.integration.yml"
 MIGRATION_DIR="${REPO_ROOT}/migrations"
 
+DATABASE_URL="postgres://village:village@localhost:5433/village?sslmode=disable"
+CONTAINER_NAME="village-postgres-integration"
+
+cleanup() {
+    local exit_code=$?
+
+    echo ""
+    echo "Stopping the integration environment..."
+
+    docker compose \
+        -f "${COMPOSE_FILE}" \
+        down -v \
+        --remove-orphans || true
+
+    exit "${exit_code}"
+}
+
+trap cleanup EXIT
+
+wait_for_postgres() {
+    echo "Waiting for PostgreSQL to become healthy..."
+
+    local status=""
+
+    for attempt in $(seq 1 30); do
+        status="$(
+            docker inspect \
+                "${CONTAINER_NAME}" \
+                --format='{{.State.Health.Status}}' \
+                2>/dev/null || true
+        )"
+
+        if [[ "${status}" == "healthy" ]]; then
+            echo "PostgreSQL is healthy."
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    echo ""
+    echo "PostgreSQL logs:"
+    docker logs "${CONTAINER_NAME}" || true
+
+    echo "PostgreSQL did not become healthy."
+    return 1
+}
+
 echo ""
 echo "========================================="
-echo " Village Integration Test Runners"
+echo " Village Integration Test Runner"
 echo "========================================="
 echo ""
 
+echo "Removing any previous integration environment..."
+
+docker compose \
+    -f "${COMPOSE_FILE}" \
+    down -v \
+    --remove-orphans
+
+echo ""
 echo "Starting PostgreSQL..."
 
 docker compose \
-    -f "$COMPOSE_FILE" \
+    -f "${COMPOSE_FILE}" \
     up -d
 
-echo ""
-echo "Waiting for PostgreSQL..."
-
-for i in {1..30}
-do
-
-    STATUS=$(docker inspect \
-        village-postgres-integration \
-        --format='{{.State.Health.Status}}')
-
-    if [ "$STATUS" = "healthyy" ]; then
-        break
-    fi
-
-    sleep 1
-done
-
-if [ "$STATUS" != "healthy" ]; then
-
-    docker logs village-postgres-integration
-
-    echo "Database never became healthy."
-
-    exit 1
-fi
+wait_for_postgres
 
 echo ""
-echo "Applying migrations..."
+echo "Applying database migrations..."
 
 migrate \
-    -path "$MIGRATION_DIR" \
-    -database "postgres://postgres:postgres@localhost:5433/village?sslmode=disable" \
+    -path "${MIGRATION_DIR}" \
+    -database "${DATABASE_URL}" \
     up
 
 echo ""
 echo "Running integration tests..."
+
+cd "${API_DIR}"
 
 go test \
     -tags=integration \
     ./internal/integration/... \
     -v
 
-RESULT=$?
-
 echo ""
-echo "Stopping integration database..."
-
-docker compose \
-    -f "$COMPOSE_FILE" \
-    down -v
-
-exit $RESULT
-trap cleanup EXIT
+echo "Integration tests passed."
