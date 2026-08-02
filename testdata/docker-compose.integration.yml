@@ -1,11 +1,7 @@
 services:
-
   postgres:
-
     image: postgres:17
-
     container_name: village-postgres-integration
-
     restart: "no"
 
     environment:
@@ -20,20 +16,18 @@ services:
       - village-integration-data:/var/lib/postgresql/data
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d village"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U village -d village"]
+      interval: 2s
       timeout: 3s
-      retries: 10
-      start_period: 5s
+      retries: 15
+      start_period: 3s
 
     networks:
       - integration
 
 networks:
-
   integration:
     driver: bridge
 
 volumes:
-
   village-integration-data:

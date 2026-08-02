@@ -25,6 +25,10 @@ func TestCommunityRepositoryCRUD(t *testing.T) {
 
 	repo := postgresrepo.NewCommunityRepository(db.Pool())
 
+	if err := repo.DeleteAll(ctx); err != nil {
+		t.Fatalf("clean communities table: %v", err)
+	}
+
 	community := model.Community{
 		Name:           "Integration Test Community",
 		Description:    "Created during integration testing",
