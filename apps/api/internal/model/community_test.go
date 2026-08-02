@@ -10,7 +10,7 @@ func TestCommunityFields(t *testing.T) {
 	now := time.Now()
 
 	c := Community{
-		ID: "community-123",
+		ID: 123,
 
 		Name: "Toronto Men",
 
@@ -27,7 +27,7 @@ func TestCommunityFields(t *testing.T) {
 		UpdatedAt: now,
 	}
 
-	if c.ID != "community-123" {
+	if c.ID != 123 {
 		t.Fatal("unexpected ID")
 	}
 
