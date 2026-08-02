@@ -4,7 +4,7 @@ import "time"
 
 // Community represents a Village community.
 type Community struct {
-	ID string
+	ID int64
 
 	Name string
 
