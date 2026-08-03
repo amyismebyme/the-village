@@ -7,17 +7,24 @@ import (
 )
 
 type CommunityRepository interface {
-	List(ctx context.Context) ([]model.Community, error)
+	Create(
+		ctx context.Context,
+		community *model.Community,
+	) error
 
 	FindByID(
 		ctx context.Context,
 		id int64,
 	) (*model.Community, error)
 
-	Create(
+	FindBySlug(
 		ctx context.Context,
-		community *model.Community,
-	) error
+		slug string,
+	) (*model.Community, error)
+
+	List(
+		ctx context.Context,
+	) ([]*model.Community, error)
 
 	Update(
 		ctx context.Context,
@@ -27,5 +34,9 @@ type CommunityRepository interface {
 	Delete(
 		ctx context.Context,
 		id int64,
+	) error
+
+	DeleteAll(
+		ctx context.Context,
 	) error
 }

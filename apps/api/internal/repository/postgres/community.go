@@ -25,13 +25,53 @@ func NewCommunityRepository(pool *pgxpool.Pool) *CommunityRepository {
 
 func (r *CommunityRepository) List(
 	ctx context.Context,
-) ([]model.Community, error) {
+) ([]*model.Community, error) {
 
-	_ = ctx
+	rows, err := r.Pool().Query(ctx, `
+SELECT
+    id,
+    name,
+    slug,
+    description,
+    external_source,
+    created_at,
+    updated_at
+FROM communities
+ORDER BY name;
+`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	// TODO:
-	// Query PostgreSQL after migrations are created.
-	return nil, fmt.Errorf("community repository: List not implemented")
+	communities := make([]*model.Community, 0)
+
+	for rows.Next() {
+
+		community := &model.Community{}
+
+		err := rows.Scan(
+			&community.ID,
+			&community.Name,
+			&community.Slug,
+			&community.Description,
+			&community.ExternalSource,
+			&community.CreatedAt,
+			&community.UpdatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		communities = append(communities, community)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return communities, nil
 }
 
 func (r *CommunityRepository) FindByID(
@@ -105,4 +145,43 @@ RESTART IDENTITY
 	}
 
 	return nil
+}
+
+func (r *CommunityRepository) FindBySlug(
+	ctx context.Context,
+	slug string,
+) (*model.Community, error) {
+
+	query := `
+SELECT
+    id,
+    name,
+    slug,
+    description,
+    external_source,
+    created_at,
+    updated_at
+FROM communities
+WHERE slug=$1;
+`
+
+	var community model.Community
+
+	err := r.Pool().
+		QueryRow(ctx, query, slug).
+		Scan(
+			&community.ID,
+			&community.Name,
+			&community.Slug,
+			&community.Description,
+			&community.ExternalSource,
+			&community.CreatedAt,
+			&community.UpdatedAt,
+		)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &community, nil
 }
