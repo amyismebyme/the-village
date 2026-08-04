@@ -16,8 +16,6 @@ func TestCommunityFields(t *testing.T) {
 
 		Slug: "toronto-men",
 
-		Category: "C1",
-
 		Description: "Helping men build friendships.",
 
 		ExternalSource: "internal",
@@ -39,9 +37,6 @@ func TestCommunityFields(t *testing.T) {
 		t.Fatal("unexpected Slug")
 	}
 
-	if c.Category != "C1" {
-		t.Fatal("unexpected Category")
-	}
 	if c.ExternalSource != "internal" {
 		t.Fatal("unexpected ExternalSource")
 	}
