@@ -6,7 +6,7 @@ CREATE TABLE communities (
 
                              description TEXT NOT NULL,
 
-                             url TEXT NOT NULL,
+                             slug TEXT NOT NULL,
 
                              external_source TEXT NOT NULL DEFAULT 'internal',
 
@@ -28,7 +28,7 @@ CREATE TABLE resources (
 
                            description TEXT NOT NULL,
 
-                           url TEXT NOT NULL,
+                           slug TEXT NOT NULL,
 
                            category TEXT NOT NULL,
 

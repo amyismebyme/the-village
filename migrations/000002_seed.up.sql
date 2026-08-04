@@ -2,14 +2,14 @@ INSERT INTO communities
 (
     name,
     description,
-    url,
+    slug,
     external_source
 )
 VALUES
     (
         'The Village',
         'Official Village Community',
-        'https://the-village.local',
+        'the-village',
         'internal'
     );
 
@@ -17,14 +17,14 @@ INSERT INTO communities
 (
     name,
     description,
-    url,
+    slug,
     external_source
 )
 VALUES
     (
         'Reddit - MensLib',
         'Healthy discussions for men',
-        'https://reddit.com/r/MensLib',
+        'the-reddit-village',
         'reddit'
     );
 
@@ -32,14 +32,14 @@ INSERT INTO resources
 (
     title,
     description,
-    url,
+    slug,
     category
 )
 VALUES
     (
         '988 Crisis Lifeline',
         '24/7 mental health support',
-        'https://988lifeline.org',
+        '988-lifeline',
         'Mental Health'
     );
 
@@ -47,13 +47,13 @@ INSERT INTO resources
 (
     title,
     description,
-    url,
+    slug,
     category
 )
 VALUES
     (
         'The Village Documentation',
         'Project documentation',
-        'https://github.com/amyismebyme/the-village',
+        'the-village',
         'Documentation'
     );
