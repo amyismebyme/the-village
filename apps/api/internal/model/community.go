@@ -10,8 +10,6 @@ type Community struct {
 
 	Slug string
 
-	Category string
-
 	Description string
 
 	ExternalSource string
