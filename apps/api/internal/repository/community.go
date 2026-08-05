@@ -35,8 +35,4 @@ type CommunityRepository interface {
 		ctx context.Context,
 		id int64,
 	) error
-
-	DeleteAll(
-		ctx context.Context,
-	) error
 }
