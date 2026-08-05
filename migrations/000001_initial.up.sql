@@ -15,6 +15,9 @@ CREATE TABLE communities (
                              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );;
 
+ALTER TABLE communities
+    ADD CONSTRAINT communities_slug_unique UNIQUE (slug);
+
 CREATE INDEX idx_communities_name
     ON communities(name);
 
