@@ -8,17 +8,22 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
+	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
+	"github.com/amyismebyme/the-village/apps/api/internal/repository/postgres"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
 
 func Run() error {
+
 	cfg := config.Load()
 
 	if err := config.Validate(cfg); err != nil {
@@ -38,16 +43,27 @@ func Run() error {
 		return fmt.Errorf("open database: %w", err)
 	}
 
-	// Close the pool if startup fails after this point.
 	startupComplete := false
+
 	defer func() {
 		if !startupComplete {
 			db.Close()
 		}
 	}()
 
+	//------------------------------------------------------------------
+	// Health
+	//------------------------------------------------------------------
+
 	healthRegistry := health.NewRegistry()
-	healthRegistry.Register(database.NewHealthChecker(db))
+
+	healthRegistry.Register(
+		database.NewHealthChecker(db),
+	)
+
+	//------------------------------------------------------------------
+	// Metrics
+	//------------------------------------------------------------------
 
 	stats := db.Stats()
 
@@ -63,10 +79,31 @@ func Run() error {
 		db.Pool(),
 	)
 
+	//------------------------------------------------------------------
+	// Dependency Injection
+	//------------------------------------------------------------------
+
+	communityRepository := postgres.NewCommunityRepository(
+		db.Pool(),
+	)
+
+	communityService := service.NewCommunityService(
+		communityRepository,
+	)
+
+	handler := handlers.NewHandler(
+		communityService,
+	)
+
+	//------------------------------------------------------------------
+	// HTTP Server
+	//------------------------------------------------------------------
+
 	httpServer := server.NewHTTPServer(
 		appLogger,
 		cfg,
 		healthRegistry,
+		handler,
 	)
 
 	appLogger.Info(
@@ -81,9 +118,12 @@ func Run() error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
+
 		err := httpServer.ListenAndServe()
 
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil &&
+			err != http.ErrServerClosed {
+
 			serverErrors <- err
 			return
 		}
@@ -93,17 +133,26 @@ func Run() error {
 
 	appLogger.Info(
 		"server started successfully",
-		"startup_ms", appruntime.Uptime().Milliseconds(),
+		"startup_ms",
+		appruntime.Uptime().Milliseconds(),
 	)
 
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	signal.Notify(
+		stop,
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+
 	defer signal.Stop(stop)
 
 	startupComplete = true
 
 	select {
+
 	case sig := <-stop:
+
 		appLogger.Info(
 			"shutdown signal received",
 			"signal", sig.String(),
@@ -111,9 +160,13 @@ func Run() error {
 		)
 
 	case err := <-serverErrors:
+
 		if err != nil {
 			db.Close()
-			return fmt.Errorf("HTTP server failed: %w", err)
+			return fmt.Errorf(
+				"http server failed: %w",
+				err,
+			)
 		}
 
 		db.Close()
@@ -124,16 +177,24 @@ func Run() error {
 		context.Background(),
 		cfg.ShutdownTimeout,
 	)
+
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+
 		db.Close()
-		return fmt.Errorf("shutdown HTTP server: %w", err)
+
+		return fmt.Errorf(
+			"shutdown http server: %w",
+			err,
+		)
 	}
 
 	db.Close()
 
-	appLogger.Info("server shutdown complete")
+	appLogger.Info(
+		"server shutdown complete",
+	)
 
 	return nil
 }
