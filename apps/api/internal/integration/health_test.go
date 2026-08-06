@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -13,8 +14,45 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
+	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
 )
+
+type stubCommunityService struct{}
+
+func (stubCommunityService) Create(
+	ctx context.Context,
+	community *model.Community,
+) error {
+	return nil
+}
+
+func (stubCommunityService) Get(
+	ctx context.Context,
+	id int64,
+) (*model.Community, error) {
+	return nil, nil
+}
+
+func (stubCommunityService) List(
+	ctx context.Context,
+) ([]*model.Community, error) {
+	return nil, nil
+}
+
+func (stubCommunityService) Update(
+	ctx context.Context,
+	community *model.Community,
+) error {
+	return nil
+}
+
+func (stubCommunityService) Delete(
+	ctx context.Context,
+	id int64,
+) error {
+	return nil
+}
 
 func TestHealthEndpoint(t *testing.T) {
 	db := OpenTestDatabase(t)
@@ -26,8 +64,10 @@ func TestHealthEndpoint(t *testing.T) {
 		slog.NewTextHandler(io.Discard, nil),
 	)
 
+	handler := handlers.NewHandler(stubCommunityService{})
+
 	testServer := httptest.NewServer(
-		server.NewRouter(appLogger, registry),
+		server.NewRouter(appLogger, registry, handler),
 	)
 	t.Cleanup(testServer.Close)
 
@@ -71,7 +111,6 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 
 	databaseStatus, exists := body.Checks[database.CheckerName]
-
 	if !exists {
 		t.Fatal("database health check missing")
 	}
