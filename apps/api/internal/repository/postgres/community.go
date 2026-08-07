@@ -40,7 +40,7 @@ FROM communities
 ORDER BY name;
 `)
 	if err != nil {
-		return nil, err
+		return nil, translateError(err)
 	}
 	defer rows.Close()
 
@@ -61,14 +61,14 @@ ORDER BY name;
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, translateError(err)
 		}
 
 		communities = append(communities, community)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, translateError(err)
 	}
 
 	return communities, nil
@@ -180,7 +180,7 @@ WHERE slug=$1;
 		)
 
 	if err != nil {
-		return nil, err
+		return nil, translateError(err)
 	}
 
 	return &community, nil
