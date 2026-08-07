@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
@@ -27,7 +26,7 @@ func (r *CommunityRepository) List(
 	ctx context.Context,
 ) ([]*model.Community, error) {
 
-	rows, err := r.Pool().Query(ctx, `
+	const query = `
 SELECT
     id,
     name,
@@ -38,40 +37,14 @@ SELECT
     updated_at
 FROM communities
 ORDER BY name;
-`)
+`
+	rows, err := r.Pool().Query(ctx, query)
+
 	if err != nil {
 		return nil, translateError(err)
 	}
-	defer rows.Close()
 
-	communities := make([]*model.Community, 0)
-
-	for rows.Next() {
-
-		community := &model.Community{}
-
-		err := rows.Scan(
-			&community.ID,
-			&community.Name,
-			&community.Slug,
-			&community.Description,
-			&community.ExternalSource,
-			&community.CreatedAt,
-			&community.UpdatedAt,
-		)
-
-		if err != nil {
-			return nil, translateError(err)
-		}
-
-		communities = append(communities, community)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, translateError(err)
-	}
-
-	return communities, nil
+	return scanCommunities(rows)
 }
 
 func (r *CommunityRepository) FindByID(
@@ -79,25 +52,75 @@ func (r *CommunityRepository) FindByID(
 	id int64,
 ) (*model.Community, error) {
 
-	_ = ctx
-	_ = id
+	query := `
+SELECT
+	id,
+	name,
+	slug,
+	description,
+	external_source,
+	created_at,
+	updated_at
+FROM communities
+WHERE id=$1;
+`
 
-	// TODO:
-	// Query PostgreSQL after migrations are created.
-	return nil, fmt.Errorf("community repository: FindByID not implemented")
+	community, err := scanCommunity(
+		r.Pool().QueryRow(ctx, query, id),
+	)
+
+	if err != nil {
+		return nil, translateError(err)
+	}
+
+	return community, nil
 }
-
 func (r *CommunityRepository) Create(
 	ctx context.Context,
 	community *model.Community,
 ) error {
 
-	_ = ctx
-	_ = community
+	query := `
+INSERT INTO communities
+(
+	name,
+	slug,
+	description,
+	external_source
+)
+VALUES
+(
+	$1,
+	$2,
+	$3,
+	$4
+)
+RETURNING
+	id,
+	created_at,
+	updated_at;
+`
 
-	// TODO:
-	// Insert community after schema exists.
-	return repository.ErrNotImplemented
+	err := r.Pool().
+		QueryRow(
+			ctx,
+			query,
+			community.Name,
+			community.Slug,
+			community.Description,
+			community.ExternalSource,
+		).
+		Scan(
+			&community.ID,
+			&community.CreatedAt,
+			&community.UpdatedAt,
+		)
+
+	if err != nil {
+		return translateError(err)
+	}
+
+	return nil
 }
 
 func (r *CommunityRepository) Update(
@@ -105,12 +128,38 @@ func (r *CommunityRepository) Update(
 	community *model.Community,
 ) error {
 
-	_ = ctx
-	_ = community
+	query := `
+UPDATE communities
+SET
 
-	// TODO:
-	// Update community after schema exists.
-	return repository.ErrNotImplemented
+	name=$1,
+	slug=$2,
+	description=$3,
+	external_source=$4,
+	updated_at=NOW()
+
+WHERE id=$5
+
+RETURNING updated_at;
+`
+
+	err := r.Pool().
+		QueryRow(
+			ctx,
+			query,
+			community.Name,
+			community.Slug,
+			community.Description,
+			community.ExternalSource,
+			community.ID,
+		).
+		Scan(&community.UpdatedAt)
+
+	if err != nil {
+		return translateError(err)
+	}
+
+	return nil
 }
 
 func (r *CommunityRepository) Delete(
@@ -118,12 +167,17 @@ func (r *CommunityRepository) Delete(
 	id int64,
 ) error {
 
-	_ = ctx
-	_ = id
+	const query = `
+DELETE FROM communities
+WHERE id=$1;
+`
 
-	// TODO:
-	// Delete community after schema exists.
-	return repository.ErrNotImplemented
+	return execOne(
+		ctx,
+		r.Repository,
+		query,
+		id,
+	)
 }
 
 // DeleteAll removes every community and resets the identity sequence.
@@ -138,10 +192,7 @@ RESTART IDENTITY
 `
 
 	if _, err := r.pool.Exec(ctx, query); err != nil {
-		return fmt.Errorf(
-			"community repository: delete all communities: %w",
-			err,
-		)
+		return translateError(err)
 	}
 
 	return nil
@@ -154,34 +205,24 @@ func (r *CommunityRepository) FindBySlug(
 
 	query := `
 SELECT
-    id,
-    name,
-    slug,
-    description,
-    external_source,
-    created_at,
-    updated_at
+	id,
+	name,
+	slug,
+	description,
+	external_source,
+	created_at,
+	updated_at
 FROM communities
 WHERE slug=$1;
 `
 
-	var community model.Community
-
-	err := r.Pool().
-		QueryRow(ctx, query, slug).
-		Scan(
-			&community.ID,
-			&community.Name,
-			&community.Slug,
-			&community.Description,
-			&community.ExternalSource,
-			&community.CreatedAt,
-			&community.UpdatedAt,
-		)
+	community, err := scanCommunity(
+		r.Pool().QueryRow(ctx, query, slug),
+	)
 
 	if err != nil {
 		return nil, translateError(err)
 	}
 
-	return &community, nil
+	return community, nil
 }
