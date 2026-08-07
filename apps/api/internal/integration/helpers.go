@@ -6,14 +6,13 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/amyismebyme/the-village/apps/api/internal/config"
+	"github.com/amyismebyme/the-village/apps/api/internal/database"
+	"github.com/joho/godotenv"
 	"os"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/amyismebyme/the-village/apps/api/internal/config"
-	"github.com/amyismebyme/the-village/apps/api/internal/database"
-	"github.com/joho/godotenv"
 )
 
 const (
