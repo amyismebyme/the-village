@@ -3,8 +3,16 @@ package repository
 import "errors"
 
 var (
-	ErrNotFound       = errors.New("repository not found")
-	ErrAlreadyExists  = errors.New("repository already exists")
-	ErrInvalidID      = errors.New("repository invalid id")
-	ErrNotImplemented = errors.New("repository method not implemented")
+
+	// Generic repository errors.
+
+	ErrNotFound = errors.New("resource not found")
+
+	ErrAlreadyExists = errors.New("resource already exists")
+
+	ErrConflict = errors.New("resource conflict")
+
+	ErrInvalidInput = errors.New("invalid repository input")
+
+	ErrNotImplemented = errors.New("repository not implemented")
 )

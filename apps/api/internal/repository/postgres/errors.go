@@ -15,9 +15,17 @@ func translateError(err error) error {
 		return nil
 	}
 
+	//----------------------------------------
+	// No rows
+	//----------------------------------------
+
 	if errors.Is(err, pgx.ErrNoRows) {
 		return repository.ErrNotFound
 	}
+
+	//----------------------------------------
+	// PostgreSQL errors
+	//----------------------------------------
 
 	var pgErr *pgconn.PgError
 
@@ -25,9 +33,17 @@ func translateError(err error) error {
 
 		switch pgErr.Code {
 
-		// unique violation
+		// unique_violation
 		case "23505":
 			return repository.ErrAlreadyExists
+
+		// foreign_key_violation
+		case "23503":
+			return repository.ErrConflict
+
+		// check_violation
+		case "23514":
+			return repository.ErrInvalidInput
 		}
 	}
 
