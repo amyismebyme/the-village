@@ -10,13 +10,6 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 )
 
-var (
-	ErrCommunityAlreadyExists = errors.New("community already exists")
-	ErrInvalidCommunity       = errors.New("invalid community")
-	ErrInvalidCommunityID     = errors.New("invalid community id")
-	ErrNilCommunity           = errors.New("community is required")
-)
-
 type CommunityService interface {
 	Create(
 		ctx context.Context,
@@ -69,25 +62,24 @@ func (s *communityService) Create(
 
 	normalizeCommunity(community)
 
-	if err := community.Validate(); err != nil {
+	if err := validateCommunity(community); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidCommunity, err)
 	}
 
-	existing, err := s.repository.FindBySlug(ctx, community.Slug)
-
-	switch {
-	case err == nil && existing != nil:
-		return fmt.Errorf(
-			"%w: slug %q",
-			ErrCommunityAlreadyExists,
-			community.Slug,
-		)
-
-	case err != nil && !errors.Is(err, repository.ErrNotFound):
+	existing, err := s.slugExists(ctx, community.Slug)
+	if err != nil {
 		return fmt.Errorf(
 			"community service: check slug %q: %w",
 			community.Slug,
 			err,
+		)
+	}
+
+	if existing != nil {
+		return fmt.Errorf(
+			"%w: slug %q",
+			ErrCommunityAlreadyExists,
+			community.Slug,
 		)
 	}
 
@@ -161,26 +153,37 @@ func (s *communityService) Update(
 
 	normalizeCommunity(community)
 
-	if err := community.Validate(); err != nil {
+	if err := validateCommunity(community); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidCommunity, err)
 	}
 
-	existing, err := s.repository.FindBySlug(ctx, community.Slug)
-
-	switch {
-	case err == nil && existing != nil && existing.ID != community.ID:
+	current, err := s.repository.FindByID(ctx, community.ID)
+	if err != nil {
 		return fmt.Errorf(
-			"%w: slug %q",
-			ErrCommunityAlreadyExists,
-			community.Slug,
-		)
-
-	case err != nil && !errors.Is(err, repository.ErrNotFound):
-		return fmt.Errorf(
-			"community service: check slug %q: %w",
-			community.Slug,
+			"community service: find community %d: %w",
+			community.ID,
 			err,
 		)
+	}
+
+	// Only check slug uniqueness if it has changed.
+	if current.Slug != community.Slug {
+		existing, err := s.slugExists(ctx, community.Slug)
+		if err != nil {
+			return fmt.Errorf(
+				"community service: check slug %q: %w",
+				community.Slug,
+				err,
+			)
+		}
+
+		if existing != nil && existing.ID != community.ID {
+			return fmt.Errorf(
+				"%w: slug %q",
+				ErrCommunityAlreadyExists,
+				community.Slug,
+			)
+		}
 	}
 
 	if err := s.repository.Update(ctx, community); err != nil {
@@ -221,13 +224,50 @@ func (s *communityService) Delete(
 	return nil
 }
 
-func normalizeCommunity(community *model.Community) {
-	community.Name = strings.TrimSpace(community.Name)
+func normalizeCommunity(c *model.Community) {
 
-	community.Slug = strings.ToLower(
-		strings.TrimSpace(community.Slug),
+	c.Name = strings.TrimSpace(c.Name)
+
+	c.Slug = strings.ToLower(
+		strings.TrimSpace(c.Slug),
 	)
 
-	community.Description = strings.TrimSpace(community.Description)
-	community.ExternalSource = strings.TrimSpace(community.ExternalSource)
+	c.Description = strings.TrimSpace(
+		c.Description,
+	)
+
+	c.ExternalSource = strings.TrimSpace(
+		c.ExternalSource,
+	)
+}
+
+func validateCommunity(
+	c *model.Community,
+) error {
+
+	if err := c.Validate(); err != nil {
+		return ErrInvalidCommunity
+	}
+
+	return nil
+}
+
+func (s *communityService) slugExists(
+	ctx context.Context,
+	slug string,
+) (*model.Community, error) {
+
+	community, err := s.repository.FindBySlug(ctx, slug)
+
+	switch {
+
+	case err == nil:
+		return community, nil
+
+	case errors.Is(err, repository.ErrNotFound):
+		return nil, nil
+
+	default:
+		return nil, err
+	}
 }
