@@ -13,7 +13,7 @@ CREATE TABLE communities (
                              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
                              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);;
+);
 
 ALTER TABLE communities
     ADD CONSTRAINT communities_slug_unique UNIQUE (slug);
