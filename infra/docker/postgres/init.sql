@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS communities (
-                                           id UUID PRIMARY KEY,
-                                           name TEXT NOT NULL,
-                                           description TEXT NOT NULL,
-                                           created_at TIMESTAMP NOT NULL
-);
+-- Application schema is managed exclusively by golang-migrate.
+--
+-- Do not create application tables in this file.
+-- See:
+--   migrations/000001_initial.up.sql
+--   migrations/000002_seed.up.sql

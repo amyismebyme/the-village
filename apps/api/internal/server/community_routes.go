@@ -11,7 +11,23 @@ func registerCommunityRoutes(
 	h *handlers.Handler,
 ) {
 	mux.HandleFunc(
-		"/communities",
+		"POST /api/v1/communities",
 		h.CreateCommunity,
 	)
+
+	mux.HandleFunc(
+		"GET /api/v1/communities",
+		h.ListCommunities,
+	)
+
+	mux.HandleFunc(
+		"GET /api/v1/communities/{id}",
+		h.GetCommunity,
+	)
+
+	mux.HandleFunc(
+		"PUT /api/v1/communities/{id}",
+		h.UpdateCommunity,
+	)
+
 }

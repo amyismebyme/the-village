@@ -66,6 +66,14 @@ func writeCommunityServiceError(
 			"community is required",
 		)
 
+	case errors.Is(err, repository.ErrNotFound):
+		writeError(
+			w,
+			http.StatusNotFound,
+			"community_not_found",
+			"community not found",
+		)
+
 	case errors.Is(err, repository.ErrAlreadyExists):
 		writeError(
 			w,
@@ -73,6 +81,9 @@ func writeCommunityServiceError(
 			"community_already_exists",
 			"community with this slug already exists",
 		)
+
+	case errors.Is(err, service.ErrInvalidCommunityID):
+		writeError(w, http.StatusBadRequest, "invalid community id", "invalid community id")
 
 	default:
 		writeError(
