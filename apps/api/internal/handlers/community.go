@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"net/http"
 	"strconv"
-	"encoding/json"
 )
 
 type createCommunityRequest struct {
