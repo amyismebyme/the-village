@@ -30,4 +30,8 @@ func registerCommunityRoutes(
 		h.UpdateCommunity,
 	)
 
+	mux.HandleFunc(
+		"DELETE /api/v1/communities/{id}",
+		h.DeleteCommunity,
+	)
 }
