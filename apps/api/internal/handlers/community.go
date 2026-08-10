@@ -22,10 +22,7 @@ func (h *Handler) CreateCommunity(
 	r *http.Request,
 ) {
 	if r.Method != http.MethodPost {
-		w.Header().Set(
-			"Allow",
-			http.MethodPost,
-		)
+		w.Header().Set("Allow", http.MethodPost)
 
 		writeError(
 			w,
@@ -37,33 +34,14 @@ func (h *Handler) CreateCommunity(
 		return
 	}
 
-	defer r.Body.Close()
-
 	var request createCommunityRequest
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
+	if err := decodeJSON(w, r, &request); err != nil {
 		writeError(
 			w,
 			http.StatusBadRequest,
-			"invalid_json",
-			"request body contains invalid JSON",
-		)
-
-		return
-	}
-
-	// Reject multiple JSON values in the request body.
-	var extra any
-
-	if err := decoder.Decode(&extra); err == nil {
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"invalid_json",
-			"request body must contain exactly one JSON object",
+			"invalid_request",
+			err.Error(),
 		)
 
 		return
@@ -171,7 +149,7 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 		writeError(
 			w,
 			http.StatusBadRequest,
-			"invalid_community_id",
+			"invalid_id",
 			"invalid community id",
 		)
 		return
@@ -203,15 +181,14 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (h *Handler) UpdateCommunity(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
+func (h *Handler) UpdateCommunity(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
+		w.Header().Set("Allow", http.MethodPut)
+
 		writeError(
 			w,
 			http.StatusMethodNotAllowed,
-			"method not allowed",
+			"method_not_allowed",
 			"method not allowed",
 		)
 		return
@@ -224,28 +201,43 @@ func (h *Handler) UpdateCommunity(
 		writeError(
 			w,
 			http.StatusBadRequest,
-			"invalid community id",
+			"invalid_id",
 			"invalid community id",
 		)
 		return
 	}
 
+	defer r.Body.Close()
+
 	var community model.Community
 
 	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&community); err != nil {
 		writeError(
 			w,
 			http.StatusBadRequest,
-			"malformed JSON",
-			"malformed JSON",
+			"invalid_json",
+			"request body contains invalid JSON",
 		)
 		return
 	}
 
-	// The resource ID comes from the URL.
-	// The client does not control the ID through the request body.
+	// Reject multiple JSON values.
+	var extra any
+
+	if err := decoder.Decode(&extra); err == nil {
+		writeError(
+			w,
+			http.StatusBadRequest,
+			"invalid_json",
+			"request body must contain exactly one JSON object",
+		)
+		return
+	}
+
+	// The URL owns the resource ID.
 	community.ID = id
 
 	if err := h.communityService.Update(
@@ -259,8 +251,7 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	// Fetch the updated resource so the API returns the
-	// canonical representation, including timestamps/database values.
+	// Fetch the canonical updated representation.
 	updated, err := h.communityService.Get(
 		r.Context(),
 		id,
@@ -277,7 +268,7 @@ func (h *Handler) UpdateCommunity(
 		writeError(
 			w,
 			http.StatusNotFound,
-			"community not found",
+			"community_not_found",
 			"community not found",
 		)
 		return
@@ -288,4 +279,53 @@ func (h *Handler) UpdateCommunity(
 		http.StatusOK,
 		updated,
 	)
+}
+
+// DeleteCommunity handles:
+//
+//	DELETE /api/v1/communities/{id}
+func (h *Handler) DeleteCommunity(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if r.Method != http.MethodDelete {
+		w.Header().Set("Allow", http.MethodDelete)
+
+		writeError(
+			w,
+			http.StatusMethodNotAllowed,
+			"method_not_allowed",
+			"method not allowed",
+		)
+
+		return
+	}
+
+	idString := r.PathValue("id")
+
+	id, err := strconv.ParseInt(idString, 10, 64)
+	if err != nil || id <= 0 {
+		writeError(
+			w,
+			http.StatusBadRequest,
+			"invalid_id",
+			"invalid community id",
+		)
+
+		return
+	}
+
+	if err := h.communityService.Delete(
+		r.Context(),
+		id,
+	); err != nil {
+		writeCommunityServiceError(
+			w,
+			err,
+		)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -8,11 +8,11 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
 
-type ErrorResponse struct {
-	Error ErrorDetail `json:"error"`
+type errorResponse struct {
+	Error errorBody `json:"error"`
 }
 
-type ErrorDetail struct {
+type errorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
@@ -26,8 +26,8 @@ func writeError(
 	writeJSON(
 		w,
 		status,
-		ErrorResponse{
-			Error: ErrorDetail{
+		errorResponse{
+			Error: errorBody{
 				Code:    code,
 				Message: message,
 			},
@@ -35,19 +35,17 @@ func writeError(
 	)
 }
 
-// writeCommunityServiceError translates service/repository errors
-// into stable HTTP responses.
 func writeCommunityServiceError(
 	w http.ResponseWriter,
 	err error,
 ) {
 	switch {
-	case errors.Is(err, service.ErrCommunityAlreadyExists):
+	case errors.Is(err, service.ErrInvalidCommunityID):
 		writeError(
 			w,
-			http.StatusConflict,
-			"community_already_exists",
-			"community with this slug already exists",
+			http.StatusBadRequest,
+			"invalid_id",
+			"invalid community id",
 		)
 
 	case errors.Is(err, service.ErrInvalidCommunity):
@@ -55,7 +53,7 @@ func writeCommunityServiceError(
 			w,
 			http.StatusBadRequest,
 			"invalid_community",
-			"community validation failed",
+			"invalid community",
 		)
 
 	case errors.Is(err, service.ErrNilCommunity):
@@ -66,6 +64,14 @@ func writeCommunityServiceError(
 			"community is required",
 		)
 
+	case errors.Is(err, service.ErrCommunityAlreadyExists):
+		writeError(
+			w,
+			http.StatusConflict,
+			"community_already_exists",
+			"community already exists",
+		)
+
 	case errors.Is(err, repository.ErrNotFound):
 		writeError(
 			w,
@@ -73,17 +79,6 @@ func writeCommunityServiceError(
 			"community_not_found",
 			"community not found",
 		)
-
-	case errors.Is(err, repository.ErrAlreadyExists):
-		writeError(
-			w,
-			http.StatusConflict,
-			"community_already_exists",
-			"community with this slug already exists",
-		)
-
-	case errors.Is(err, service.ErrInvalidCommunityID):
-		writeError(w, http.StatusBadRequest, "invalid community id", "invalid community id")
 
 	default:
 		writeError(
