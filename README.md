@@ -37,4 +37,4 @@ Observability
 
 ## Status
 
-🚧 Sprint 1 - Foundation
+🚧 Ready for building UI components

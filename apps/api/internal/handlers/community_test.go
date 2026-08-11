@@ -255,7 +255,7 @@ func TestCreateCommunityMalformedJSON(t *testing.T) {
 // POST invalid community
 // -----------------------------------------------------------------------------
 
-func TestCreateCommunityInvalidFields(t *testing.T) {
+func TestCreateCommunityValidationError(t *testing.T) {
 	t.Parallel()
 
 	serviceCalled := false
@@ -517,39 +517,6 @@ func TestListCommunitiesServiceError(t *testing.T) {
 		t.Fatalf(
 			"expected status %d, got %d",
 			http.StatusInternalServerError,
-			recorder.Code,
-		)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// GET /api/v1/communities - wrong method
-// -----------------------------------------------------------------------------
-
-func TestListCommunitiesMethodNotAllowed(t *testing.T) {
-	t.Parallel()
-
-	mockService := &communityServiceMock{}
-
-	handler := NewHandler(mockService)
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/communities",
-		nil,
-	)
-
-	recorder := httptest.NewRecorder()
-
-	handler.ListCommunities(
-		recorder,
-		req,
-	)
-
-	if recorder.Code != http.StatusMethodNotAllowed {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusMethodNotAllowed,
 			recorder.Code,
 		)
 	}
@@ -818,42 +785,7 @@ func TestGetCommunityNotFound(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// GET /api/v1/communities/:id - wrong method
-// -----------------------------------------------------------------------------
-
-func TestGetCommunityMethodNotAllowed(t *testing.T) {
-	t.Parallel()
-
-	mockService := &communityServiceMock{}
-
-	handler := NewHandler(mockService)
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/communities/1",
-		nil,
-	)
-
-	req.SetPathValue("id", "1")
-
-	recorder := httptest.NewRecorder()
-
-	handler.GetCommunity(
-		recorder,
-		req,
-	)
-
-	if recorder.Code != http.StatusMethodNotAllowed {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusMethodNotAllowed,
-			recorder.Code,
-		)
-	}
-}
-
-func TestUpdateCommunityDuplicateSlug(t *testing.T) {
+func TestUpdateCommunityDuplicate(t *testing.T) {
 	t.Parallel()
 
 	mockService := &communityServiceMock{
@@ -1472,5 +1404,245 @@ func TestUpdateCommunityMultipleJSONValues(t *testing.T) {
 
 	if serviceCalled {
 		t.Fatal("expected service not to be called for multiple JSON values")
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Method enforcement
+// -----------------------------------------------------------------------------
+
+func TestCreateCommunityMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&communityServiceMock{})
+
+	methods := []string{
+		http.MethodGet,
+		http.MethodPut,
+		http.MethodDelete,
+	}
+
+	for _, method := range methods {
+		method := method
+
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(
+				method,
+				"/api/v1/communities",
+				nil,
+			)
+
+			recorder := httptest.NewRecorder()
+
+			handler.CreateCommunity(recorder, req)
+
+			if recorder.Code != http.StatusMethodNotAllowed {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusMethodNotAllowed,
+					recorder.Code,
+				)
+			}
+
+			if got := recorder.Header().Get("Allow"); got != http.MethodPost {
+				t.Fatalf(
+					"expected Allow header %q, got %q",
+					http.MethodPost,
+					got,
+				)
+			}
+		})
+	}
+}
+
+func TestListCommunitiesMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&communityServiceMock{})
+
+	methods := []string{
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodDelete,
+	}
+
+	for _, method := range methods {
+		method := method
+
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(
+				method,
+				"/api/v1/communities",
+				nil,
+			)
+
+			recorder := httptest.NewRecorder()
+
+			handler.ListCommunities(recorder, req)
+
+			if recorder.Code != http.StatusMethodNotAllowed {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusMethodNotAllowed,
+					recorder.Code,
+				)
+			}
+
+			if got := recorder.Header().Get("Allow"); got != http.MethodGet {
+				t.Fatalf(
+					"expected Allow header %q, got %q",
+					http.MethodGet,
+					got,
+				)
+			}
+		})
+	}
+}
+
+func TestGetCommunityMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&communityServiceMock{})
+
+	methods := []string{
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodDelete,
+	}
+
+	for _, method := range methods {
+		method := method
+
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(
+				method,
+				"/api/v1/communities/1",
+				nil,
+			)
+
+			req.SetPathValue("id", "1")
+
+			recorder := httptest.NewRecorder()
+
+			handler.GetCommunity(recorder, req)
+
+			if recorder.Code != http.StatusMethodNotAllowed {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusMethodNotAllowed,
+					recorder.Code,
+				)
+			}
+
+			if got := recorder.Header().Get("Allow"); got != http.MethodGet {
+				t.Fatalf(
+					"expected Allow header %q, got %q",
+					http.MethodGet,
+					got,
+				)
+			}
+		})
+	}
+}
+
+func TestUpdateCommunityMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&communityServiceMock{})
+
+	methods := []string{
+		http.MethodGet,
+		http.MethodPost,
+		http.MethodDelete,
+	}
+
+	for _, method := range methods {
+		method := method
+
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(
+				method,
+				"/api/v1/communities/1",
+				nil,
+			)
+
+			req.SetPathValue("id", "1")
+
+			recorder := httptest.NewRecorder()
+
+			handler.UpdateCommunity(recorder, req)
+
+			if recorder.Code != http.StatusMethodNotAllowed {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusMethodNotAllowed,
+					recorder.Code,
+				)
+			}
+
+			if got := recorder.Header().Get("Allow"); got != http.MethodPut {
+				t.Fatalf(
+					"expected Allow header %q, got %q",
+					http.MethodPut,
+					got,
+				)
+			}
+		})
+	}
+}
+
+func TestDeleteCommunityMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&communityServiceMock{})
+
+	methods := []string{
+		http.MethodGet,
+		http.MethodPost,
+		http.MethodPut,
+	}
+
+	for _, method := range methods {
+		method := method
+
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(
+				method,
+				"/api/v1/communities/1",
+				nil,
+			)
+
+			req.SetPathValue("id", "1")
+
+			recorder := httptest.NewRecorder()
+
+			handler.DeleteCommunity(recorder, req)
+
+			if recorder.Code != http.StatusMethodNotAllowed {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusMethodNotAllowed,
+					recorder.Code,
+				)
+			}
+
+			if got := recorder.Header().Get("Allow"); got != http.MethodDelete {
+				t.Fatalf(
+					"expected Allow header %q, got %q",
+					http.MethodDelete,
+					got,
+				)
+			}
+		})
 	}
 }
