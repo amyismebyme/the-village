@@ -18,8 +18,3 @@ func writeJSON(
 	// nothing useful the handler can do if encoding fails.
 	_ = json.NewEncoder(w).Encode(data)
 }
-
-// writeNoContent sends a 204 response with no response body.
-func writeNoContent(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNoContent)
-}
