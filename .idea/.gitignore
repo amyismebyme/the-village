@@ -1,3 +1,21 @@
+# Go build artifacts
+apps/api/bin/
+
+# Go test / coverage output
+apps/api/coverage.out
+
+# Environment files
+.env
+.env.*
+
+# Local IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
 # Default ignored files
 /shelf/
 /workspace.xml

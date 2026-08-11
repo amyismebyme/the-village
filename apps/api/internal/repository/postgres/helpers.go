@@ -53,27 +53,3 @@ func execOne(
 
 	return nil
 }
-
-func exists(
-	ctx context.Context,
-	r Repository,
-	query string,
-	args ...any,
-) (bool, error) {
-
-	var value bool
-
-	err := r.Pool().
-		QueryRow(
-			ctx,
-			query,
-			args...,
-		).
-		Scan(&value)
-
-	if err != nil {
-		return false, translateError(err)
-	}
-
-	return value, nil
-}
