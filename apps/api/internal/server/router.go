@@ -17,15 +17,10 @@ func NewRouter(
 
 	mux := http.NewServeMux()
 
-	// Register all routes
-	registerSystemRoutes(
+	registerRoutes(
 		mux,
 		appLogger,
 		healthRegistry,
-	)
-
-	registerCommunityRoutes(
-		mux,
 		handler,
 	)
 
