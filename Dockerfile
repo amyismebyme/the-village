@@ -1,36 +1,62 @@
-# ---------- Build Stage ----------
-FROM golang:1.26.5 AS builder
+# syntax=docker/dockerfile:1
 
-WORKDIR /app
+# -----------------------------------------------------------------------------
+# Build stage
+# -----------------------------------------------------------------------------
 
-COPY apps/api/go.mod .
-COPY apps/api/go.sum .
+FROM golang:1.26.5-alpine AS builder
 
-#only needed to bypass the proxy on laptop
+WORKDIR /src
+
+# Install certificates needed for HTTPS during dependency downloads.
+RUN apk add --no-cache ca-certificates
+
+# Copy dependency manifests first so Docker can cache dependency downloads.
+COPY apps/api/go.mod apps/api/go.sum ./apps/api/
+
+WORKDIR /src/apps/api
+
+
 COPY zscaler.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 RUN go mod download
 
-COPY apps/api .
+# Copy the API source.
+WORKDIR /src
+COPY apps/api ./apps/api
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o village-api ./cmd/api
+WORKDIR /src/apps/api
 
-# ---------- Runtime Stage ----------
-FROM alpine:3.18.6
+# Build a static Linux binary.
+RUN CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64 \
+    go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/village-api \
+    ./cmd/api
 
-RUN addgroup -S village && \
-    adduser -S village -G village
+
+# -----------------------------------------------------------------------------
+# Runtime stage
+# -----------------------------------------------------------------------------
+
+FROM alpine:3.22 AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /app/village-api .
+# Install CA certificates for outbound HTTPS requests.
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S village \
+    && adduser -S village -G village
+
+COPY --from=builder /out/village-api /app/village-api
+
+RUN chown village:village /app/village-api
 
 USER village
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s \
-CMD wget --spider http://localhost:8080/health || exit 1
-
-ENTRYPOINT ["./village-api"]
+ENTRYPOINT ["/app/village-api"]

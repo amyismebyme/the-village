@@ -65,14 +65,20 @@ clean:
 	rm -rf $(APP_DIR)/bin
 	rm -f $(APP_DIR)/coverage.out
 
+```makefile
 .PHONY: docker-build
 docker-build:
-	docker build -t $(APP_NAME) .
+	docker build -t village-api:local .
 
 .PHONY: docker-run
 docker-run:
-	docker run --rm -p 8080:8080 $(APP_NAME)
+	docker run --rm -p 8080:8080 village-api:local
 
-.PHONY: docker-compose
-docker-compose:
-	docker compose up
+.PHONY: docker-shell
+docker-shell:
+	docker run --rm -it --entrypoint /bin/sh village-api:local
+
+.PHONY: docker-clean
+docker-clean:
+	docker image rm village-api:local
+```

@@ -1,12 +1,36 @@
+# Git
 .git
+.gitignore
 .github
 
-bin/
+# Go build artifacts
+apps/api/bin
+apps/api/vendor
 
-docs/
+# Test / coverage output
+apps/api/coverage.out
 
-*.log
-
+# Local environment files
 .env
+.env.*
+!.env.example
 
-coverage.out
+# IDE / editor files
+.vscode
+.idea
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation that isn't required to build the image
+docs
+
+# Local infrastructure data
+infra/prometheus/data
+infra/grafana/data
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
