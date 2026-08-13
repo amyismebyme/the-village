@@ -7,6 +7,8 @@ BINARY := $(BIN_DIR)/village-api
 GO := go
 DOCKER := docker
 COMPOSE := docker compose
+TEST_COMPOSE_FILE := testdata/docker-compose.test.yml
+TEST_COMPOSE := $(COMPOSE) -f $(TEST_COMPOSE_FILE)
 
 .PHONY: help
 .PHONY: run
@@ -57,6 +59,8 @@ test:
 	cd $(API_DIR) && $(GO) test ./...
 
 test-integration:
+	$(TEST_COMPOSE) up -d --wait
+	trap '$(TEST_COMPOSE) down -v' EXIT; \
 	cd $(API_DIR) && $(GO) test -tags=integration ./internal/integration/... -v -count=1
 
 test-race:
