@@ -7,8 +7,13 @@ BINARY := $(BIN_DIR)/village-api
 GO := go
 DOCKER := docker
 COMPOSE := docker compose
+
 TEST_COMPOSE_FILE := testdata/docker-compose.integration.yml
 TEST_COMPOSE := $(COMPOSE) -f $(TEST_COMPOSE_FILE)
+
+TEST_DB_URL := postgres://village:village@localhost:5433/village?sslmode=disable
+TEST_MIGRATIONS_DIR := migrations
+TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 
 .PHONY: help
 .PHONY: run
@@ -59,9 +64,29 @@ test:
 	cd $(API_DIR) && $(GO) test ./...
 
 test-integration:
-	$(TEST_COMPOSE) up -d --wait
-	trap '$(TEST_COMPOSE) down -v' EXIT; \
-	cd $(API_DIR) && $(GO) test -tags=integration ./internal/integration/... -v -count=1
+	COMPOSE_FILE="$$(pwd)/$(TEST_COMPOSE_FILE)"; \
+	trap '$(COMPOSE) -f "$$COMPOSE_FILE" down -v --remove-orphans' EXIT INT TERM; \
+	$(COMPOSE) -f "$$COMPOSE_FILE" up -d --wait; \
+	$(DOCKER) run --rm \
+		--network host \
+		-v "$$(pwd)/$(TEST_MIGRATIONS_DIR):/migrations:ro" \
+		$(TEST_MIGRATE_IMAGE) \
+		-path=/migrations \
+		-database="$(TEST_DB_URL)" \
+		up; \
+	cd $(API_DIR) && \
+		APP_ENV=integration \
+		DB_HOST=localhost \
+		DB_PORT=5433 \
+		DB_USER=village \
+		DB_PASSWORD=village \
+		DB_NAME=village \
+		DB_SSLMODE=disable \
+		$(GO) test \
+			-tags=integration \
+			./internal/integration/... \
+			-v \
+			-count=1
 
 test-race:
 	cd $(API_DIR) && $(GO) test -race ./...

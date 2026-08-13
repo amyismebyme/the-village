@@ -24,10 +24,6 @@ jobs:
 
     timeout-minutes: 15
 
-    defaults:
-      run:
-        shell: bash
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,70 +39,5 @@ jobs:
         working-directory: apps/api
         run: go mod download
 
-      - name: Start PostgreSQL
-        run: |
-          docker compose \
-            -f testdata/docker-compose.integration.yml \
-            up -d
-
-      - name: Wait for PostgreSQL
-        run: |
-          for attempt in $(seq 1 30); do
-            status="$(
-              docker inspect \
-                village-postgres-integration \
-                --format='{{.State.Health.Status}}' \
-                2>/dev/null || true
-            )"
-
-            if [[ "${status}" == "healthy" ]]; then
-              echo "PostgreSQL is healthy."
-              exit 0
-            fi
-
-            echo "Waiting for PostgreSQL: attempt ${attempt}/30"
-            sleep 2
-          done
-
-          echo "PostgreSQL did not become healthy."
-          docker logs village-postgres-integration
-          exit 1
-
-      - name: Run database migrations
-        run: |
-          docker run --rm \
-            --network host \
-            -v "${GITHUB_WORKSPACE}/migrations:/migrations:ro" \
-            migrate/migrate:v4.18.3 \
-            -path=/migrations \
-            -database="postgres://village:village@localhost:5433/village?sslmode=disable" \
-            up
-
       - name: Run integration tests
-        working-directory: apps/api
-        env:
-          APP_ENV: integration
-          DB_HOST: localhost
-          DB_PORT: "5433"
-          DB_USER: village
-          DB_PASSWORD: village
-          DB_NAME: village
-          DB_SSLMODE: disable
-        run: |
-          go test \
-            -tags=integration \
-            ./internal/integration/... \
-            -v \
-            -count=1
-
-      - name: Show PostgreSQL logs after failure
-        if: failure()
-        run: docker logs village-postgres-integration || true
-
-      - name: Shutdown PostgreSQL
-        if: always()
-        run: |
-          docker compose \
-            -f testdata/docker-compose.integration.yml \
-            down -v \
-            --remove-orphans
+        run: make test-integration
