@@ -1,62 +1,113 @@
 //go:build integration
-// +build integration
 
 package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/amyismebyme/the-village/apps/api/internal/config"
-	"github.com/amyismebyme/the-village/apps/api/internal/database"
-	"github.com/joho/godotenv"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/config"
+	"github.com/amyismebyme/the-village/apps/api/internal/database"
+	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
+	"github.com/amyismebyme/the-village/apps/api/internal/health"
+	"github.com/amyismebyme/the-village/apps/api/internal/logger"
+	"github.com/amyismebyme/the-village/apps/api/internal/model"
+	"github.com/amyismebyme/the-village/apps/api/internal/repository/postgres"
+	"github.com/amyismebyme/the-village/apps/api/internal/server"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
+	"github.com/joho/godotenv"
 )
 
 const (
-	waitTimeout = 30 * time.Second
-	retryDelay  = 1 * time.Second
+	databaseWaitTimeout = 30 * time.Second
+	databaseRetryDelay  = 1 * time.Second
 )
 
-var loadEnvOnce sync.Once
+var integrationEnvOnce sync.Once
 
-// loadIntegrationEnv loads the integration environment file once.
+// -----------------------------------------------------------------------------
+// Shared integration environment
+// -----------------------------------------------------------------------------
+
+// loadIntegrationEnv loads the integration environment once.
+//
+// .env.integration lives beside the integration tests under:
+//
+//	internal/integration/.env.integration
+//
+// godotenv.Overload is intentional here because the integration environment
+// should take precedence over an existing local environment when running
+// integration tests.
 func loadIntegrationEnv() {
-
-	loadEnvOnce.Do(func() {
-
+	integrationEnvOnce.Do(func() {
 		if err := godotenv.Overload(".env.integration"); err != nil {
 			fmt.Printf(
 				"warning: unable to load .env.integration: %v\n",
 				err,
 			)
 		}
-
 	})
 }
 
-// OpenTestDatabase opens a real PostgreSQL database
-// using the application's configuration.
-func OpenTestDatabase(t *testing.T) *database.Database {
+// MustGetEnv returns an environment variable or panics when it is missing.
+func MustGetEnv(key string) string {
+	value := os.Getenv(key)
 
+	if value == "" {
+		panic(fmt.Sprintf(
+			"environment variable %s not set",
+			key,
+		))
+	}
+
+	return value
+}
+
+// -----------------------------------------------------------------------------
+// Database harness
+// -----------------------------------------------------------------------------
+
+// OpenTestDatabase opens the real PostgreSQL database configured for
+// integration testing and waits until PostgreSQL is reachable.
+//
+// The returned database is automatically closed when the test finishes.
+func OpenTestDatabase(t *testing.T) *database.Database {
 	t.Helper()
 
 	loadIntegrationEnv()
 
 	cfg := config.Load()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		databaseWaitTimeout,
+	)
+	defer cancel()
 
 	db, err := database.Open(ctx, cfg.Database)
 	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
+		t.Fatalf(
+			"open integration database: %v",
+			err,
+		)
 	}
 
 	if err := WaitForDatabase(ctx, db); err != nil {
 		db.Close()
-		t.Fatalf("database never became ready: %v", err)
+
+		t.Fatalf(
+			"database never became ready: %v",
+			err,
+		)
 	}
 
 	t.Cleanup(func() {
@@ -66,29 +117,38 @@ func OpenTestDatabase(t *testing.T) *database.Database {
 	return db
 }
 
-// WaitForDatabase retries Ping until PostgreSQL becomes available.
+// WaitForDatabase waits until the application's database connection can
+// successfully ping PostgreSQL.
 func WaitForDatabase(
 	ctx context.Context,
 	db *database.Database,
 ) error {
+	if db == nil {
+		return fmt.Errorf("database is nil")
+	}
 
-	timeout := time.NewTimer(waitTimeout)
+	// Try immediately instead of unnecessarily waiting for the first ticker.
+	if err := db.Ping(ctx); err == nil {
+		return nil
+	}
+
+	timeout := time.NewTimer(databaseWaitTimeout)
 	defer timeout.Stop()
 
-	ticker := time.NewTicker(retryDelay)
+	ticker := time.NewTicker(databaseRetryDelay)
 	defer ticker.Stop()
 
 	var lastErr error
 
 	for {
-
 		select {
-
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf(
+				"waiting for database: %w",
+				ctx.Err(),
+			)
 
 		case <-timeout.C:
-
 			if lastErr != nil {
 				return fmt.Errorf(
 					"timed out waiting for database: %w",
@@ -101,7 +161,6 @@ func WaitForDatabase(
 			)
 
 		case <-ticker.C:
-
 			err := db.Ping(ctx)
 
 			if err == nil {
@@ -113,17 +172,222 @@ func WaitForDatabase(
 	}
 }
 
-// MustGetEnv returns an environment variable or panics.
-func MustGetEnv(key string) string {
+// -----------------------------------------------------------------------------
+// Shared application harness
+// -----------------------------------------------------------------------------
 
-	value := os.Getenv(key)
+// integrationApp represents the complete HTTP application used by integration
+// tests:
+//
+//	HTTP
+//	  ↓
+//	Handler
+//	  ↓
+//	Service
+//	  ↓
+//	Repository
+//	  ↓
+//	PostgreSQL
+type integrationApp struct {
+	server *httptest.Server
+	db     *database.Database
+	repo   *postgres.CommunityRepository
+}
 
-	if value == "" {
-		panic(fmt.Sprintf(
-			"environment variable %s not set",
-			key,
-		))
+// newIntegrationApp creates a complete application backed by the real
+// PostgreSQL database.
+func newIntegrationApp(t *testing.T) *integrationApp {
+	t.Helper()
+
+	loadIntegrationEnv()
+
+	db := OpenTestDatabase(t)
+
+	repo := postgres.NewCommunityRepository(
+		db.Pool(),
+	)
+
+	ctx := context.Background()
+
+	// Each integration test starts with a clean community table.
+	if err := repo.DeleteAll(ctx); err != nil {
+		t.Fatalf(
+			"clean communities before test: %v",
+			err,
+		)
 	}
 
-	return value
+	// Also clean up after the test.
+	t.Cleanup(func() {
+		if err := repo.DeleteAll(context.Background()); err != nil {
+			t.Logf(
+				"clean communities after test: %v",
+				err,
+			)
+		}
+	})
+
+	communityService := service.NewCommunityService(repo)
+
+	handler := handlers.NewHandler(
+		communityService,
+	)
+
+	cfg := config.Load()
+
+	appLogger := logger.New(cfg)
+
+	healthRegistry := health.NewRegistry()
+
+	httpHandler := server.NewRouter(
+		appLogger,
+		healthRegistry,
+		handler,
+	)
+
+	testServer := httptest.NewServer(
+		httpHandler,
+	)
+
+	t.Cleanup(func() {
+		testServer.Close()
+	})
+
+	return &integrationApp{
+		server: testServer,
+		db:     db,
+		repo:   repo,
+	}
+}
+
+// -----------------------------------------------------------------------------
+// HTTP helpers
+// -----------------------------------------------------------------------------
+
+func integrationRequest(
+	t *testing.T,
+	app *integrationApp,
+	method string,
+	path string,
+	body string,
+) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(
+		method,
+		app.server.URL+path,
+		strings.NewReader(body),
+	)
+	if err != nil {
+		t.Fatalf(
+			"create %s request: %v",
+			method,
+			err,
+		)
+	}
+
+	if body != "" {
+		req.Header.Set(
+			"Content-Type",
+			"application/json",
+		)
+	}
+
+	resp, err := app.server.Client().Do(req)
+	if err != nil {
+		t.Fatalf(
+			"execute %s %s: %v",
+			method,
+			path,
+			err,
+		)
+	}
+
+	return resp
+}
+
+// communityAPIRequest is kept as a small compatibility wrapper so existing
+// Community API tests do not need to duplicate HTTP setup.
+func communityAPIRequest(
+	t *testing.T,
+	app *integrationApp,
+	method string,
+	path string,
+	body string,
+) *http.Response {
+	t.Helper()
+
+	return integrationRequest(
+		t,
+		app,
+		method,
+		path,
+		body,
+	)
+}
+
+// -----------------------------------------------------------------------------
+// JSON response helpers
+// -----------------------------------------------------------------------------
+
+func decodeCommunity(
+	t *testing.T,
+	resp *http.Response,
+) model.Community {
+	t.Helper()
+
+	defer resp.Body.Close()
+
+	var community model.Community
+
+	if err := json.NewDecoder(
+		resp.Body,
+	).Decode(&community); err != nil {
+		t.Fatalf(
+			"decode community response: %v",
+			err,
+		)
+	}
+
+	return community
+}
+
+type communityListResponse struct {
+	Communities []*model.Community `json:"communities"`
+}
+
+func decodeCommunityList(
+	t *testing.T,
+	resp *http.Response,
+) communityListResponse {
+	t.Helper()
+
+	defer resp.Body.Close()
+
+	var response communityListResponse
+
+	if err := json.NewDecoder(
+		resp.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode community list response: %v",
+			err,
+		)
+	}
+
+	return response
+}
+
+// -----------------------------------------------------------------------------
+// URL helpers
+// -----------------------------------------------------------------------------
+
+func communityPath(id int64) string {
+	return "/api/v1/communities/" +
+		strconv.FormatInt(id, 10)
+}
+
+// Backward-compatible name for existing tests.
+func communityIDPath(id int64) string {
+	return communityPath(id)
 }

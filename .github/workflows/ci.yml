@@ -1,20 +1,19 @@
-name: Village API CI
+name: CI
 
 on:
   push:
     branches:
       - main
-      - feature/**
+      - "feature/**"
+
   pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
 
 jobs:
-  test:
-
+  quality:
+    name: Build and Test
     runs-on: ubuntu-latest
 
     defaults:
@@ -22,8 +21,7 @@ jobs:
         working-directory: apps/api
 
     steps:
-
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
@@ -31,33 +29,34 @@ jobs:
         with:
           go-version-file: apps/api/go.mod
           cache: true
+          cache-dependency-path: apps/api/go.sum
 
-      - name: Download Dependencies
-        run: go mod download
+      - name: Verify dependencies
+        run: go mod verify
 
-      - name: Verify Formatting
-        run: test -z "$(gofmt -l .)"
+      - name: Check formatting
+        shell: bash
+        run: |
+          files="$(gofmt -l .)"
 
-      - name: Run Vet
+          if [ -n "$files" ]; then
+            echo "The following files are not formatted:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Vet
         run: go vet ./...
 
-      - name: Run Unit Tests
-        run: go test ./... -v
+      - name: Lint
+        working-directory: .
+        run: golangci-lint run
 
-      - name: Run Race Detector
+      - name: Unit tests
+        run: go test ./...
+
+      - name: Race tests
         run: go test -race ./...
 
-      - name: Generate Coverage
-        run: |
-          go test ./... \
-            -covermode=atomic \
-            -coverprofile=coverage.out
-
-      - name: Coverage Summary
-        run: go tool cover -func=coverage.out
-
-      - name: Upload Coverage Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: apps/api/coverage.out
+      - name: Build
+        run: go build ./...
