@@ -2,13 +2,16 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
+	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
 	"github.com/amyismebyme/the-village/apps/api/internal/testutil"
 )
 
@@ -153,4 +156,131 @@ func newDiscardLogger() *slog.Logger {
 	return slog.New(
 		slog.NewTextHandler(io.Discard, nil),
 	)
+}
+
+func assertJSONError(
+	t *testing.T,
+	rec *httptest.ResponseRecorder,
+	expectedStatus int,
+	expectedCode string,
+) {
+	t.Helper()
+
+	if rec.Code != expectedStatus {
+		t.Fatalf(
+			"expected status %d, got %d",
+			expectedStatus,
+			rec.Code,
+		)
+	}
+
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf(
+			"expected Content-Type application/json, got %q",
+			got,
+		)
+	}
+
+	var response errorResponse
+
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode error response: %v",
+			err,
+		)
+	}
+
+	if response.Error.Code != expectedCode {
+		t.Fatalf(
+			"expected error code %q, got %q",
+			expectedCode,
+			response.Error.Code,
+		)
+	}
+
+	if response.Error.Message == "" {
+		t.Fatal("expected error message")
+	}
+}
+
+func assertRequestID(
+	t *testing.T,
+	rec *httptest.ResponseRecorder,
+) {
+	t.Helper()
+
+	if requestID := rec.Header().Get("X-Request-ID"); requestID == "" {
+		t.Fatal("expected X-Request-ID header")
+	}
+}
+
+func TestRecoveryReturnsJSONError(t *testing.T) {
+	t.Parallel()
+
+	next := http.HandlerFunc(func(
+		w http.ResponseWriter,
+		r *http.Request,
+	) {
+		panic("test panic")
+	})
+
+	handler := middleware.Recovery(
+		slog.Default(),
+		next,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/test",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusInternalServerError,
+			rec.Code,
+		)
+	}
+
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf(
+			"expected application/json, got %q",
+			got,
+		)
+	}
+
+	var response struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(
+		rec.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode recovery response: %v",
+			err,
+		)
+	}
+
+	if response.Error.Code != "internal_error" {
+		t.Fatalf(
+			"expected internal_error, got %q",
+			response.Error.Code,
+		)
+	}
+
+	if response.Error.Message != "internal server error" {
+		t.Fatalf(
+			"unexpected message %q",
+			response.Error.Message,
+		)
+	}
 }

@@ -1,11 +1,9 @@
 package handlers
 
-//Version Handler for the app
 import (
-	"encoding/json"
-	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
-	"log"
 	"net/http"
+
+	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 )
 
 type VersionResponse struct {
@@ -15,26 +13,17 @@ type VersionResponse struct {
 }
 
 func VersionHandler(w http.ResponseWriter, r *http.Request) {
-
 	response := VersionResponse{
 		Version:   appruntime.BuildVersion,
 		GitCommit: appruntime.GitCommit,
-		BuildDate: appruntime.BuildTime.Format("2006-01-02T15:04:05Z07:00"),
+		BuildDate: appruntime.BuildTime.Format(
+			"2006-01-02T15:04:05Z07:00",
+		),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	w.WriteHeader(http.StatusOK)
-
-	err := json.NewEncoder(w).Encode(response)
-
-	if err != nil {
-		log.Printf("failed to encode Root response: %v", err)
-		http.Error(
-			w,
-			"failed to encode Version response",
-			http.StatusInternalServerError,
-		)
-		return
-	}
+	writeJSON(
+		w,
+		http.StatusOK,
+		response,
+	)
 }

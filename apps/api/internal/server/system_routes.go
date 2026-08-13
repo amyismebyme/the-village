@@ -1,14 +1,12 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
-
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"log/slog"
 )
 
 func registerSystemRoutes(
@@ -16,23 +14,31 @@ func registerSystemRoutes(
 	appLogger *slog.Logger,
 	healthRegistry *health.Registry,
 ) {
-
-	mux.HandleFunc("/", handlers.RootHandler)
-
 	mux.Handle(
-		"/health",
+		"GET /health",
 		handlers.NewHealthHandler(
 			appLogger,
 			healthRegistry,
 		),
 	)
 
-	mux.HandleFunc("/ready", handlers.ReadyHandler)
-	mux.HandleFunc("/version", handlers.VersionHandler)
-	mux.HandleFunc("/status", handlers.StatusHandler)
+	mux.HandleFunc(
+		"GET /ready",
+		handlers.ReadyHandler,
+	)
+
+	mux.HandleFunc(
+		"GET /version",
+		handlers.VersionHandler,
+	)
+
+	mux.HandleFunc(
+		"GET /status",
+		handlers.StatusHandler,
+	)
 
 	mux.Handle(
-		"/metrics",
+		"GET /metrics",
 		promhttp.Handler(),
 	)
 }

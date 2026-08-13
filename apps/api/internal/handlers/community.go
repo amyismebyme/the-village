@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"net/http"
 	"strconv"
@@ -181,7 +180,10 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (h *Handler) UpdateCommunity(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateCommunity(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	if r.Method != http.MethodPut {
 		w.Header().Set("Allow", http.MethodPut)
 
@@ -207,60 +209,42 @@ func (h *Handler) UpdateCommunity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer r.Body.Close()
-
 	var community model.Community
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&community); err != nil {
+	// Decode exactly once. decodeJSON should also reject
+	// unknown fields and multiple JSON objects/values.
+	if err := decodeJSON(
+		w,
+		r,
+		&community,
+	); err != nil {
 		writeError(
 			w,
 			http.StatusBadRequest,
-			"invalid_json",
-			"request body contains invalid JSON",
+			"invalid_request",
+			err.Error(),
 		)
 		return
 	}
 
-	// Reject multiple JSON values.
-	var extra any
-
-	if err := decoder.Decode(&extra); err == nil {
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"invalid_json",
-			"request body must contain exactly one JSON object",
-		)
-		return
-	}
-
-	// The URL owns the resource ID.
+	// The URL is authoritative for the resource ID.
 	community.ID = id
 
 	if err := h.communityService.Update(
 		r.Context(),
 		&community,
 	); err != nil {
-		writeCommunityServiceError(
-			w,
-			err,
-		)
+		writeCommunityServiceError(w, err)
 		return
 	}
 
-	// Fetch the canonical updated representation.
+	// Return the canonical representation after the update.
 	updated, err := h.communityService.Get(
 		r.Context(),
 		id,
 	)
 	if err != nil {
-		writeCommunityServiceError(
-			w,
-			err,
-		)
+		writeCommunityServiceError(w, err)
 		return
 	}
 

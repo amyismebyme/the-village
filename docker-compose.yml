@@ -1,43 +1,31 @@
-
 services:
   village-api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: village-api
 
     ports:
       - "8080:8080"
 
     environment:
-      PORT: 8080
+      PORT: "8080"
       ENVIRONMENT: development
       LOG_LEVEL: info
 
-    depends_on:
-      - postgres
-
-  prometheus:
-    image: prom/prometheus
-
-    container_name: prometheus
-
-    ports:
-      - "9090:9090"
-
-    volumes:
-      - ./infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      # PostgreSQL connection
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: village
+      DATABASE_USER: village
+      DATABASE_PASSWORD: village
 
     depends_on:
-      - village-api
+      postgres:
+        condition: service_healthy
 
-  grafana:
-    image: grafana/grafana
-
-    container_name: grafana
-
-    ports:
-      - "3000:3000"
-
-    depends_on:
-      - prometheus
+    restart: unless-stopped
 
   postgres:
     image: postgres:17
@@ -54,7 +42,51 @@ services:
 
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U village -d village"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+
+    container_name: prometheus
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+    depends_on:
+      village-api:
+        condition: service_started
+
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+
+    container_name: grafana
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      prometheus:
+        condition: service_started
+
+    restart: unless-stopped
 
 volumes:
   postgres-data:
