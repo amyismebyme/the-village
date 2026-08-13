@@ -158,62 +158,6 @@ func newDiscardLogger() *slog.Logger {
 	)
 }
 
-func assertJSONError(
-	t *testing.T,
-	rec *httptest.ResponseRecorder,
-	expectedStatus int,
-	expectedCode string,
-) {
-	t.Helper()
-
-	if rec.Code != expectedStatus {
-		t.Fatalf(
-			"expected status %d, got %d",
-			expectedStatus,
-			rec.Code,
-		)
-	}
-
-	if got := rec.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf(
-			"expected Content-Type application/json, got %q",
-			got,
-		)
-	}
-
-	var response errorResponse
-
-	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
-		t.Fatalf(
-			"decode error response: %v",
-			err,
-		)
-	}
-
-	if response.Error.Code != expectedCode {
-		t.Fatalf(
-			"expected error code %q, got %q",
-			expectedCode,
-			response.Error.Code,
-		)
-	}
-
-	if response.Error.Message == "" {
-		t.Fatal("expected error message")
-	}
-}
-
-func assertRequestID(
-	t *testing.T,
-	rec *httptest.ResponseRecorder,
-) {
-	t.Helper()
-
-	if requestID := rec.Header().Get("X-Request-ID"); requestID == "" {
-		t.Fatal("expected X-Request-ID header")
-	}
-}
-
 func TestRecoveryReturnsJSONError(t *testing.T) {
 	t.Parallel()
 

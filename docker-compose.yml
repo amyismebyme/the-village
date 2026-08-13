@@ -15,7 +15,7 @@ services:
       LOG_LEVEL: info
 
       # PostgreSQL connection
-      DATABASE_HOST: postgres
+      DATABASE_HOST: localhost
       DATABASE_PORT: "5432"
       DATABASE_NAME: village
       DATABASE_USER: village
