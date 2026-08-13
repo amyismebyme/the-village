@@ -7,50 +7,62 @@ on:
       - "feature/**"
 
   pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
 
 jobs:
   quality:
-    name: Build, Test, Vet & Lint
+    name: Build and Test
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        shell: bash
+        working-directory: apps/api
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/api/go.mod
           cache: true
+          cache-dependency-path: apps/api/go.sum
 
-      - name: Verify formatting
-        run: make fmt-check
+      - name: Verify dependencies
+        run: go mod verify
 
-      - name: Download dependencies
+      - name: Check formatting
+        shell: bash
         run: |
-          cd apps/api
-          go mod download
+          files="$(gofmt -l .)"
 
-      - name: Run tests
-        run: make test
+          if [ -n "$files" ]; then
+            echo "The following files are not formatted:"
+            echo "$files"
+            exit 1
+          fi
 
-      - name: Run race detector
-        run: make test-race
+      - name: Vet
+        run: go vet ./...
 
-      - name: Run vet
-        run: make vet
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.9.0
+          working-directory: apps/api
 
-      - name: Run linter
-        run: make lint
+      - name: Unit tests
+        run: go test ./...
+
+      - name: Integration tests
+        working-directory: .
+        run: make test-integration
+
+      - name: Race tests
+        run: go test -race ./...
 
       - name: Build
-        run: make build
+        run: go build ./...
