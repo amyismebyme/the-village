@@ -58,10 +58,11 @@ build:
 test:
 	cd $(API_DIR) && $(GO) test ./...
 
+.PHONY: test-integration
 test-integration:
-	$(TEST_COMPOSE) up -d --wait
-	trap '$(TEST_COMPOSE) down -v' EXIT; \
-	cd $(API_DIR) && $(GO) test -tags=integration ./internal/integration/... -v -count=1
+	docker compose -f testdata/docker-compose.integration.yml up -d --wait
+	trap 'docker compose -f testdata/docker-compose.integration.yml down -v' EXIT; \
+	cd $(APP_DIR) && go test -tags=integration ./internal/integration/... -v -count=1
 
 test-race:
 	cd $(API_DIR) && $(GO) test -race ./...
