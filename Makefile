@@ -7,7 +7,7 @@ BINARY := $(BIN_DIR)/village-api
 GO := go
 DOCKER := docker
 COMPOSE := docker compose
-TEST_COMPOSE_FILE := testdata/docker-compose.test.yml
+TEST_COMPOSE_FILE := testdata/docker-compose.integration.yml
 TEST_COMPOSE := $(COMPOSE) -f $(TEST_COMPOSE_FILE)
 
 .PHONY: help
