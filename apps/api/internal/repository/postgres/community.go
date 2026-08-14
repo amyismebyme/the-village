@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
@@ -16,7 +17,6 @@ type CommunityRepository struct {
 }
 
 func NewCommunityRepository(pool *pgxpool.Pool) *CommunityRepository {
-
 	return &CommunityRepository{
 		Repository: New(pool),
 	}
@@ -24,7 +24,13 @@ func NewCommunityRepository(pool *pgxpool.Pool) *CommunityRepository {
 
 func (r *CommunityRepository) List(
 	ctx context.Context,
-) ([]*model.Community, error) {
+) (communities []*model.Community, err error) {
+
+	start := time.Now()
+
+	defer func() {
+		observeQuery("list", start, err)
+	}()
 
 	const query = `
 SELECT
@@ -38,21 +44,32 @@ SELECT
 FROM communities
 ORDER BY name;
 `
-	rows, err := r.Pool().Query(ctx, query)
 
+	rows, err := r.Pool().Query(ctx, query)
 	if err != nil {
 		return nil, translateError(err)
 	}
 
-	return scanCommunities(rows)
+	communities, err = scanCommunities(rows)
+	if err != nil {
+		return nil, translateError(err)
+	}
+
+	return communities, nil
 }
 
 func (r *CommunityRepository) FindByID(
 	ctx context.Context,
 	id int64,
-) (*model.Community, error) {
+) (community *model.Community, err error) {
 
-	query := `
+	start := time.Now()
+
+	defer func() {
+		observeQuery("find_by_id", start, err)
+	}()
+
+	const query = `
 SELECT
 	id,
 	name,
@@ -65,7 +82,7 @@ FROM communities
 WHERE id=$1;
 `
 
-	community, err := scanCommunity(
+	community, err = scanCommunity(
 		r.Pool().QueryRow(ctx, query, id),
 	)
 
@@ -75,12 +92,19 @@ WHERE id=$1;
 
 	return community, nil
 }
+
 func (r *CommunityRepository) Create(
 	ctx context.Context,
 	community *model.Community,
-) error {
+) (err error) {
 
-	query := `
+	start := time.Now()
+
+	defer func() {
+		observeQuery("create", start, err)
+	}()
+
+	const query = `
 INSERT INTO communities
 (
 	name,
@@ -101,7 +125,7 @@ RETURNING
 	updated_at;
 `
 
-	err := r.Pool().
+	err = r.Pool().
 		QueryRow(
 			ctx,
 			query,
@@ -126,24 +150,27 @@ RETURNING
 func (r *CommunityRepository) Update(
 	ctx context.Context,
 	community *model.Community,
-) error {
+) (err error) {
 
-	query := `
+	start := time.Now()
+
+	defer func() {
+		observeQuery("update", start, err)
+	}()
+
+	const query = `
 UPDATE communities
 SET
-
 	name=$1,
 	slug=$2,
 	description=$3,
 	external_source=$4,
 	updated_at=NOW()
-
 WHERE id=$5
-
 RETURNING updated_at;
 `
 
-	err := r.Pool().
+	err = r.Pool().
 		QueryRow(
 			ctx,
 			query,
@@ -165,19 +192,25 @@ RETURNING updated_at;
 func (r *CommunityRepository) Delete(
 	ctx context.Context,
 	id int64,
-) error {
+) (err error) {
+
+	start := time.Now()
+
+	defer func() {
+		observeQuery("delete", start, err)
+	}()
 
 	const query = `
 DELETE FROM communities
 WHERE id=$1;
 `
 
-	return execOne(
-		ctx,
-		r.Repository,
-		query,
-		id,
-	)
+	_, err = r.Pool().Exec(ctx, query, id)
+	if err != nil {
+		return translateError(err)
+	}
+
+	return nil
 }
 
 // DeleteAll removes every community and resets the identity sequence.
@@ -185,13 +218,21 @@ WHERE id=$1;
 // This method is primarily intended for integration-test cleanup.
 func (r *CommunityRepository) DeleteAll(
 	ctx context.Context,
-) error {
+) (err error) {
+
+	start := time.Now()
+
+	defer func() {
+		observeQuery("delete_all", start, err)
+	}()
+
 	const query = `
 TRUNCATE TABLE communities
 RESTART IDENTITY
 `
 
-	if _, err := r.pool.Exec(ctx, query); err != nil {
+	_, err = r.pool.Exec(ctx, query)
+	if err != nil {
 		return translateError(err)
 	}
 
@@ -201,9 +242,15 @@ RESTART IDENTITY
 func (r *CommunityRepository) FindBySlug(
 	ctx context.Context,
 	slug string,
-) (*model.Community, error) {
+) (community *model.Community, err error) {
 
-	query := `
+	start := time.Now()
+
+	defer func() {
+		observeQuery("find_by_slug", start, err)
+	}()
+
+	const query = `
 SELECT
 	id,
 	name,
@@ -216,7 +263,7 @@ FROM communities
 WHERE slug=$1;
 `
 
-	community, err := scanCommunity(
+	community, err = scanCommunity(
 		r.Pool().QueryRow(ctx, query, slug),
 	)
 

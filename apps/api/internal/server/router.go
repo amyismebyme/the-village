@@ -6,6 +6,7 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
 )
 
@@ -29,7 +30,9 @@ func NewRouter(
 		middleware.RequestID(
 			middleware.Logging(
 				appLogger,
-				mux,
+				metrics.Middleware(
+					mux,
+				),
 			),
 		),
 	)
