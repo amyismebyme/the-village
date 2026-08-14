@@ -17,7 +17,7 @@ COPY apps/api/go.mod apps/api/go.sum ./apps/api/
 WORKDIR /src/apps/api
 
 
-COPY zscaler.crt /usr/local/share/ca-certificates/
+COPY zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
 RUN update-ca-certificates
 RUN go mod download
 

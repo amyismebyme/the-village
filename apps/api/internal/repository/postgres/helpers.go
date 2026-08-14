@@ -1,9 +1,7 @@
 package postgres
 
 import (
-	"context"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
-	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -28,28 +26,4 @@ func scanCommunity(
 	}
 
 	return community, nil
-}
-
-func execOne(
-	ctx context.Context,
-	r Repository,
-	query string,
-	args ...any,
-) error {
-
-	result, err := r.Pool().Exec(
-		ctx,
-		query,
-		args...,
-	)
-
-	if err != nil {
-		return translateError(err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return repository.ErrNotFound
-	}
-
-	return nil
 }

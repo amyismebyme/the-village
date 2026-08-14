@@ -14,7 +14,7 @@ var RequestsTotal = prometheus.NewCounterVec(
 		Name: "village_http_requests_total",
 		Help: "Total HTTP requests..",
 	},
-	[]string{"method", "path", "status"},
+	[]string{"method", "route", "status"},
 )
 
 var RequestDuration = prometheus.NewHistogramVec(
@@ -23,7 +23,7 @@ var RequestDuration = prometheus.NewHistogramVec(
 		Help:    "HTTP request latency.",
 		Buckets: []float64{0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 	},
-	[]string{"method", "path"},
+	[]string{"method", "route"},
 )
 
 var RequestsInFlight = prometheus.NewGauge(
@@ -51,18 +51,22 @@ var ErrorsTotal = prometheus.NewCounterVec(
 var DatabaseQueriesTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "village_db_queries_total",
-		Help: "Total database queries.",
+		Help: "Total database queries by operation and status.",
 	},
-	[]string{"operation"},
+	[]string{
+		"operation",
+		"status",
+	},
 )
 
 var DatabaseQueryDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Name:    "village_db_query_duration_seconds",
-		Help:    "Database query latency.",
-		Buckets: prometheus.DefBuckets,
+		Name: "village_db_query_duration_seconds",
+		Help: "Database query duration in seconds.",
 	},
-	[]string{"operation"},
+	[]string{
+		"operation",
+	},
 )
 
 var BuildInfo = prometheus.NewGaugeVec(

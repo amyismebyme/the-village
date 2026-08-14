@@ -15,11 +15,12 @@ services:
       LOG_LEVEL: info
 
       # PostgreSQL connection
-      DATABASE_HOST: localhost
-      DATABASE_PORT: "5432"
-      DATABASE_NAME: village
-      DATABASE_USER: village
-      DATABASE_PASSWORD: village
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: village
+      DB_USER: village
+      DB_PASSWORD: village
+      DB_SSLMODE: disable
 
     depends_on:
       postgres:

@@ -9,7 +9,7 @@ API_DIR="${REPO_ROOT}/apps/api"
 COMPOSE_FILE="${REPO_ROOT}/testdata/docker-compose.integration.yml"
 MIGRATION_DIR="${REPO_ROOT}/migrations"
 
-DATABASE_URL="postgres://village:village@localhost:5433/village?sslmode=disable"
+DATABASE_URL="postgres://village:village@postgres:5433/village?sslmode=disable"
 CONTAINER_NAME="village-postgres-integration"
 
 cleanup() {

@@ -66,14 +66,14 @@ test:
 test-integration:
 	COMPOSE_FILE="$$(pwd)/$(TEST_COMPOSE_FILE)"; \
 	trap '$(COMPOSE) -f "$$COMPOSE_FILE" down -v --remove-orphans' EXIT INT TERM; \
-	$(COMPOSE) -f "$$COMPOSE_FILE" up -d --wait; \
+	$(COMPOSE) -f "$$COMPOSE_FILE" up -d --wait && \
 	$(DOCKER) run --rm \
 		--network host \
 		-v "$$(pwd)/$(TEST_MIGRATIONS_DIR):/migrations:ro" \
 		$(TEST_MIGRATE_IMAGE) \
 		-path=/migrations \
 		-database="$(TEST_DB_URL)" \
-		up; \
+		up && \
 	cd $(API_DIR) && \
 		APP_ENV=integration \
 		DB_HOST=localhost \
