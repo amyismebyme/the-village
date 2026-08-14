@@ -1,9 +1,7 @@
 package postgres
 
 import (
-	"context"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
-	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/jackc/pgx/v5"
 )
 
