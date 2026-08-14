@@ -135,7 +135,6 @@ func TestHTTPMetricsStatus(t *testing.T) {
 	}
 }
 
-
 func TestHTTPMetricsInFlight(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
