@@ -11,7 +11,7 @@ COMPOSE := docker compose
 TEST_COMPOSE_FILE := testdata/docker-compose.integration.yml
 TEST_COMPOSE := $(COMPOSE) -f $(TEST_COMPOSE_FILE)
 
-TEST_DB_URL := postgres://village:village@localhost:5433/village?sslmode=disable
+TEST_DB_URL := postgres://village:village@postgres:5433/village?sslmode=disable
 TEST_MIGRATIONS_DIR := migrations
 TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 
