@@ -29,27 +29,3 @@ func scanCommunity(
 
 	return community, nil
 }
-
-func execOne(
-	ctx context.Context,
-	r Repository,
-	query string,
-	args ...any,
-) error {
-
-	result, err := r.Pool().Exec(
-		ctx,
-		query,
-		args...,
-	)
-
-	if err != nil {
-		return translateError(err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return repository.ErrNotFound
-	}
-
-	return nil
-}

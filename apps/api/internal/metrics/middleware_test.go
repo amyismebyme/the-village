@@ -135,58 +135,6 @@ func TestHTTPMetricsStatus(t *testing.T) {
 	}
 }
 
-func gatherHistogramCount(
-	t *testing.T,
-	metricName string,
-	method string,
-	route string,
-) uint64 {
-	t.Helper()
-
-	registry := prometheus.NewRegistry()
-
-	registry.MustRegister(RequestDuration)
-
-	families, err := registry.Gather()
-	if err != nil {
-		t.Fatalf("gather metrics: %v", err)
-	}
-
-	for _, family := range families {
-		if family.GetName() != metricName {
-			continue
-		}
-
-		for _, metric := range family.GetMetric() {
-			labels := make(map[string]string)
-
-			for _, label := range metric.GetLabel() {
-				labels[label.GetName()] = label.GetValue()
-			}
-
-			if labels["method"] != method {
-				continue
-			}
-
-			// If Task 2 has already changed this from path → route,
-			// this is the correct label to check.
-			if labels["route"] != route {
-				continue
-			}
-
-			if metric.Histogram == nil {
-				t.Fatalf(
-					"metric %q is not a histogram",
-					metricName,
-				)
-			}
-
-			return metric.Histogram.GetSampleCount()
-		}
-	}
-
-	return 0
-}
 
 func TestHTTPMetricsInFlight(t *testing.T) {
 	started := make(chan struct{})
