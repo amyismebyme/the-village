@@ -76,7 +76,7 @@ test-integration:
 		up; \
 	cd $(API_DIR) && \
 		APP_ENV=integration \
-		DB_HOST=localhost \
+		DB_HOST=postgres \
 		DB_PORT=5433 \
 		DB_USER=village \
 		DB_PASSWORD=village \
