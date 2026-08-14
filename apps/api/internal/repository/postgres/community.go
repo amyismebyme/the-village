@@ -190,31 +190,31 @@ RETURNING updated_at;
 }
 
 func (r *CommunityRepository) Delete(
-    ctx context.Context,
-    id int64,
+	ctx context.Context,
+	id int64,
 ) (err error) {
 
-    start := time.Now()
+	start := time.Now()
 
-    defer func() {
-        observeQuery("delete", start, err)
-    }()
+	defer func() {
+		observeQuery("delete", start, err)
+	}()
 
-    const query = `
+	const query = `
 DELETE FROM communities
 WHERE id=$1;
 `
 
-    result, err := r.Pool().Exec(ctx, query, id)
-    if err != nil {
-        return translateError(err)
-    }
+	result, err := r.Pool().Exec(ctx, query, id)
+	if err != nil {
+		return translateError(err)
+	}
 
-    if result.RowsAffected() == 0 {
-        return repository.ErrNotFound
-    }
+	if result.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
 
-    return nil
+	return nil
 }
 
 // DeleteAll removes every community and resets the identity sequence.
