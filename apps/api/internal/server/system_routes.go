@@ -14,12 +14,14 @@ func registerSystemRoutes(
 	appLogger *slog.Logger,
 	healthRegistry *health.Registry,
 ) {
+	healthHandler := handlers.NewHealthHandler(
+		appLogger,
+		healthRegistry,
+	)
+
 	mux.Handle(
 		"GET /health",
-		handlers.NewHealthHandler(
-			appLogger,
-			healthRegistry,
-		),
+		healthHandler,
 	)
 
 	mux.HandleFunc(

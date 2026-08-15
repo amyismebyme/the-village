@@ -4,19 +4,31 @@ import "net/http"
 
 type responseRecorder struct {
 	http.ResponseWriter
-	status int
+	status      int
+	wroteHeader bool
 }
 
-func (r *responseRecorder) WriteHeader(status int) {
-	r.status = status
-	r.ResponseWriter.WriteHeader(status)
-}
-
-func (r *responseRecorder) Write(b []byte) (int, error) {
-
-	if r.status == 0 {
-		r.status = http.StatusOK
+func (r *responseRecorder) WriteHeader(code int) {
+	if r.wroteHeader {
+		return
 	}
 
-	return r.ResponseWriter.Write(b)
+	r.status = code
+	r.wroteHeader = true
+
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *responseRecorder) Write(body []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+
+	return r.ResponseWriter.Write(body)
+}
+
+// Unwrap allows http.ResponseController and other stdlib
+// functionality to reach the original ResponseWriter.
+func (r *responseRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
