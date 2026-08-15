@@ -20,7 +20,6 @@ func (m mockChecker) Check(ctx context.Context) error {
 }
 
 func TestRegistry_Register(t *testing.T) {
-
 	registry := NewRegistry()
 
 	registry.Register(mockChecker{
@@ -36,7 +35,6 @@ func TestRegistry_Register(t *testing.T) {
 }
 
 func TestRegistry_Check_AllHealthy(t *testing.T) {
-
 	registry := NewRegistry()
 
 	registry.Register(mockChecker{
@@ -56,17 +54,34 @@ func TestRegistry_Check_AllHealthy(t *testing.T) {
 		)
 	}
 
-	if results["database"] != nil {
-		t.Fatal("expected database health check to succeed")
+	database := findResult(results, "database")
+
+	if database == nil {
+		t.Fatal("expected database health result")
 	}
 
-	if results["redis"] != nil {
-		t.Fatal("expected redis health check to succeed")
+	if database.Error != "" {
+		t.Fatalf(
+			"expected database health check to succeed, got %q",
+			database.Error,
+		)
+	}
+
+	redis := findResult(results, "redis")
+
+	if redis == nil {
+		t.Fatal("expected redis health result")
+	}
+
+	if redis.Error != "" {
+		t.Fatalf(
+			"expected redis health check to succeed, got %q",
+			redis.Error,
+		)
 	}
 }
 
 func TestRegistry_Check_WithFailure(t *testing.T) {
-
 	expectedErr := errors.New("database unavailable")
 
 	registry := NewRegistry()
@@ -78,13 +93,22 @@ func TestRegistry_Check_WithFailure(t *testing.T) {
 
 	results := registry.Check(context.Background())
 
-	if !errors.Is(results["database"], expectedErr) {
-		t.Fatal("expected database error")
+	database := findResult(results, "database")
+
+	if database == nil {
+		t.Fatal("expected database health result")
+	}
+
+	if database.Error != expectedErr.Error() {
+		t.Fatalf(
+			"expected database error %q, got %q",
+			expectedErr.Error(),
+			database.Error,
+		)
 	}
 }
 
 func TestRegistry_Check_EmptyRegistry(t *testing.T) {
-
 	registry := NewRegistry()
 
 	results := registry.Check(context.Background())
@@ -95,4 +119,17 @@ func TestRegistry_Check_EmptyRegistry(t *testing.T) {
 			len(results),
 		)
 	}
+}
+
+func findResult(
+	results []Result,
+	name string,
+) *Result {
+	for i := range results {
+		if results[i].Name == name {
+			return &results[i]
+		}
+	}
+
+	return nil
 }

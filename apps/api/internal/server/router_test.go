@@ -1,16 +1,19 @@
 package server
 
 import (
+	"bytes"
 	"context"
-	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
-	"github.com/amyismebyme/the-village/apps/api/internal/health"
-	"github.com/amyismebyme/the-village/apps/api/internal/model"
-	"github.com/amyismebyme/the-village/apps/api/internal/service"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
+	"github.com/amyismebyme/the-village/apps/api/internal/health"
+	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
+	"github.com/amyismebyme/the-village/apps/api/internal/model"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
 
 // -----------------------------------------------------------------------------
@@ -398,6 +401,90 @@ func TestRouterUnknownSystemPathReturnsNotFound(t *testing.T) {
 			"expected status %d, got %d",
 			http.StatusNotFound,
 			rec.Code,
+		)
+	}
+}
+
+func TestRouterLogsNormalizedCommunityRoute(t *testing.T) {
+	var logs bytes.Buffer
+
+	logger := slog.New(
+		slog.NewTextHandler(
+			&logs,
+			&slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			},
+		),
+	)
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"GET /api/v1/communities/{id}",
+		func(
+			w http.ResponseWriter,
+			r *http.Request,
+		) {
+			w.WriteHeader(http.StatusOK)
+		},
+	)
+
+	handler := middleware.RequestID(
+		middleware.Logging(
+			logger,
+			mux,
+		),
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/communities/839274",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	output := logs.String()
+
+	if !strings.Contains(
+		output,
+		"route=/api/v1/communities/{id}",
+	) {
+		t.Fatalf(
+			"expected normalized community route; got:\n%s",
+			output,
+		)
+	}
+
+	if !strings.Contains(
+		output,
+		"status=200",
+	) {
+		t.Fatalf(
+			"expected status=200; got:\n%s",
+			output,
+		)
+	}
+
+	if !strings.Contains(
+		output,
+		"request_id=",
+	) {
+		t.Fatalf(
+			"expected request_id; got:\n%s",
+			output,
+		)
+	}
+
+	if !strings.Contains(
+		output,
+		"duration_ms=",
+	) {
+		t.Fatalf(
+			"expected duration_ms; got:\n%s",
+			output,
 		)
 	}
 }

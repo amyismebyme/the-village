@@ -1,32 +1,36 @@
 package middleware
 
-//Logging of requests and all the details
 import (
 	"log/slog"
 	"net/http"
 	"time"
 )
 
-func Logging(appLogger *slog.Logger, next http.Handler) http.Handler {
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
+func Logging(
+	logger *slog.Logger,
+	next http.Handler,
+) http.Handler {
+	return http.HandlerFunc(func(
+		w http.ResponseWriter,
+		r *http.Request,
+	) {
 		start := time.Now()
 
-		recorder := &responseRecorder{
+		rec := &responseRecorder{
 			ResponseWriter: w,
 			status:         http.StatusOK,
 		}
 
-		next.ServeHTTP(recorder, r)
+		next.ServeHTTP(rec, r)
+
 		duration := time.Since(start)
 
-		appLogger.Info(
-			"request completed",
+		logger.Info(
+			"http request completed",
 			"request_id", GetRequestID(r.Context()),
 			"method", r.Method,
-			"path", r.URL.Path,
-			"status", recorder.status,
+			"route", routeLabel(r),
+			"status", rec.status,
 			"duration_ms", duration.Milliseconds(),
 		)
 	})

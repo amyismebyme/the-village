@@ -31,8 +31,10 @@ func NewHealthHandler(
 			response.Checks["registry"] = "unhealthy"
 			statusCode = http.StatusServiceUnavailable
 		} else {
-			for name, checkErr := range registry.Check(r.Context()) {
-				if checkErr != nil {
+			for _, result := range registry.Check(r.Context()) {
+				name := result.Name
+
+				if result.Error != "" {
 					response.Status = "unhealthy"
 					response.Checks[name] = "unhealthy"
 					statusCode = http.StatusServiceUnavailable
@@ -41,7 +43,7 @@ func NewHealthHandler(
 						appLogger.Warn(
 							"health check failed",
 							"check", name,
-							"error", checkErr,
+							"error", result.Error,
 						)
 					}
 

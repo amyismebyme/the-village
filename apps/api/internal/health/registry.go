@@ -18,11 +18,21 @@ func (r *Registry) Register(checker Checker) {
 	r.checkers = append(r.checkers, checker)
 }
 
-func (r *Registry) Check(ctx context.Context) map[string]error {
-	results := make(map[string]error, len(r.checkers))
+func (r *Registry) Check(ctx context.Context) []Result {
+	results := make([]Result, 0, len(r.checkers))
 
 	for _, checker := range r.checkers {
-		results[checker.Name()] = checker.Check(ctx)
+		err := checker.Check(ctx)
+
+		result := Result{
+			Name: checker.Name(),
+		}
+
+		if err != nil {
+			result.Error = err.Error()
+		}
+
+		results = append(results, result)
 	}
 
 	return results
