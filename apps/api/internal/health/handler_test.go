@@ -9,10 +9,7 @@ import (
 	"testing"
 )
 
-type testCheck struct {
-	name string
-	err  string
-}
+
 
 func TestHealthLivenessReturnsOKWithoutRegistry(t *testing.T) {
 	logger := slog.Default()
