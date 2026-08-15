@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-
-
 func TestHealthLivenessReturnsOKWithoutRegistry(t *testing.T) {
 	logger := slog.Default()
 
