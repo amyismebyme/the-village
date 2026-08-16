@@ -247,7 +247,7 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	updated, err := h.communityService.Get(
+	updatedCommunity, err := h.communityService.Get(
 		r.Context(),
 		id,
 	)
@@ -256,22 +256,12 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	if updated == nil {
-		writeError(
-			w,
-			http.StatusNotFound,
-			"community_not_found",
-			"community not found",
-		)
-
-		return
-	}
-
 	httputil.WriteJSON(
 		w,
 		http.StatusOK,
-		newCommunityResponse(updated),
+		newCommunityResponse(updatedCommunity),
 	)
+
 }
 
 // DeleteCommunity handles:

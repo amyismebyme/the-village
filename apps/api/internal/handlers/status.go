@@ -10,7 +10,7 @@ import (
 type StatusResponse struct {
 	Status    string `json:"status"`
 	Version   string `json:"version"`
-	BuildTime string `json:"BuildTime"`
+	BuildTime string `json:"build_date"`
 	GoVersion string `json:"go_version"`
 	Uptime    string `json:"uptime"`
 	StartedAt string `json:"started_at"`
