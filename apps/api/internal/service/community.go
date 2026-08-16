@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
@@ -60,7 +59,7 @@ func (s *communityService) Create(
 		return ErrNilCommunity
 	}
 
-	normalizeCommunity(community)
+	community.Normalize()
 
 	if err := validateCommunity(community); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidCommunity, err)
@@ -151,7 +150,7 @@ func (s *communityService) Update(
 		return ErrInvalidCommunityID
 	}
 
-	normalizeCommunity(community)
+	community.Normalize()
 
 	if err := validateCommunity(community); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidCommunity, err)
@@ -222,23 +221,6 @@ func (s *communityService) Delete(
 	}
 
 	return nil
-}
-
-func normalizeCommunity(c *model.Community) {
-
-	c.Name = strings.TrimSpace(c.Name)
-
-	c.Slug = strings.ToLower(
-		strings.TrimSpace(c.Slug),
-	)
-
-	c.Description = strings.TrimSpace(
-		c.Description,
-	)
-
-	c.ExternalSource = strings.TrimSpace(
-		c.ExternalSource,
-	)
 }
 
 func validateCommunity(

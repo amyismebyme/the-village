@@ -12,7 +12,22 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
+
+type testCommunityResponse struct {
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	Slug           string    `json:"slug"`
+	Description    string    `json:"description,omitempty"`
+	ExternalSource string    `json:"external_source,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type testCommunityListResponse struct {
+	Communities []testCommunityResponse `json:"communities"`
+}
 
 // -----------------------------------------------------------------------------
 // Mock Community Service
@@ -381,9 +396,7 @@ func TestListCommunities(t *testing.T) {
 		)
 	}
 
-	var response struct {
-		Communities []*model.Community `json:"communities"`
-	}
+	var response testCommunityListResponse
 
 	if err := json.NewDecoder(
 		recorder.Body,
@@ -456,9 +469,7 @@ func TestListCommunitiesEmpty(t *testing.T) {
 		)
 	}
 
-	var response struct {
-		Communities []*model.Community `json:"communities"`
-	}
+	var response testCommunityListResponse
 
 	if err := json.NewDecoder(
 		recorder.Body,
@@ -642,7 +653,7 @@ func TestGetCommunity(t *testing.T) {
 		)
 	}
 
-	var response model.Community
+	var response testCommunityResponse
 
 	if err := json.NewDecoder(
 		recorder.Body,
@@ -915,7 +926,7 @@ func TestUpdateCommunity(t *testing.T) {
 		t.Fatalf("expected Get to be called with ID 1, got %d", getCalledWith)
 	}
 
-	var response model.Community
+	var response testCommunityResponse
 
 	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -1644,5 +1655,61 @@ func TestDeleteCommunityMethodNotAllowed(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestUpdateCommunityGetFailure(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		updateFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			return nil
+		},
+		getFunc: func(
+			ctx context.Context,
+			id int64,
+		) (*model.Community, error) {
+			return nil, errors.New("database unavailable")
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men's Community",
+		"slug": "toronto-men",
+		"description": "Updated description.",
+		"external_source": "manual"
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/communities/1",
+		strings.NewReader(body),
+	)
+
+	req.SetPathValue("id", "1")
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	recorder := httptest.NewRecorder()
+
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusInternalServerError,
+			recorder.Code,
+		)
 	}
 }

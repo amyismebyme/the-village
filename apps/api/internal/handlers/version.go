@@ -9,8 +9,8 @@ import (
 
 type VersionResponse struct {
 	Version   string `json:"version"`
-	GitCommit string `json:"GitCommit"`
-	BuildDate string `json:"buildDate"`
+	GitCommit string `json:"git_commit"`
+	BuildDate string `json:"build_date"`
 }
 
 func VersionHandler(w http.ResponseWriter, r *http.Request) {

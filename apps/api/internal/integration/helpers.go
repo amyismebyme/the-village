@@ -32,6 +32,20 @@ const (
 	databaseRetryDelay  = 1 * time.Second
 )
 
+type integrationCommunityResponse struct {
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	Slug           string    `json:"slug"`
+	Description    string    `json:"description,omitempty"`
+	ExternalSource string    `json:"external_source,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type integrationCommunityListResponse struct {
+	Communities []integrationCommunityResponse `json:"communities"`
+}
+
 var integrationEnvOnce sync.Once
 
 // -----------------------------------------------------------------------------
@@ -333,12 +347,12 @@ func communityAPIRequest(
 func decodeCommunity(
 	t *testing.T,
 	resp *http.Response,
-) model.Community {
+) integrationCommunityResponse {
 	t.Helper()
 
 	defer resp.Body.Close()
 
-	var community model.Community
+	var community integrationCommunityResponse
 
 	if err := json.NewDecoder(
 		resp.Body,
@@ -359,23 +373,21 @@ type communityListResponse struct {
 func decodeCommunityList(
 	t *testing.T,
 	resp *http.Response,
-) communityListResponse {
+) integrationCommunityListResponse {
 	t.Helper()
 
 	defer resp.Body.Close()
 
-	var response communityListResponse
+	var community integrationCommunityListResponse
 
-	if err := json.NewDecoder(
-		resp.Body,
-	).Decode(&response); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&community); err != nil {
 		t.Fatalf(
 			"decode community list response: %v",
 			err,
 		)
 	}
 
-	return response
+	return community
 }
 
 // -----------------------------------------------------------------------------

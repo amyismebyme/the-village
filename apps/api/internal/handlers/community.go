@@ -240,38 +240,28 @@ func (h *Handler) UpdateCommunity(
 	}
 
 	if err := h.communityService.Update(
-		r.Context(),
-		community,
-	); err != nil {
-		writeServiceError(w, err)
-		return
-	}
+    	r.Context(),
+    	community,
+    ); err != nil {
+    	writeServiceError(w, err)
+    	return
+    }
 
-	updated, err := h.communityService.Get(
-		r.Context(),
-		id,
-	)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
+    updatedCommunity, err := h.communityService.Get(
+    	r.Context(),
+    	id,
+    )
+    if err != nil {
+    	writeServiceError(w, err)
+    	return
+    }
 
-	if updated == nil {
-		writeError(
-			w,
-			http.StatusNotFound,
-			"community_not_found",
-			"community not found",
-		)
+    httputil.WriteJSON(
+    	w,
+    	http.StatusOK,
+    	newCommunityResponse(updatedCommunity),
+    )
 
-		return
-	}
-
-	httputil.WriteJSON(
-		w,
-		http.StatusOK,
-		newCommunityResponse(updated),
-	)
 }
 
 // DeleteCommunity handles:
