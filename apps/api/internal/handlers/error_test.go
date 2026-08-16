@@ -104,7 +104,7 @@ func TestWriteCommunityServiceError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
-			writeCommunityServiceError(
+			writeServiceError(
 				recorder,
 				tt.err,
 			)

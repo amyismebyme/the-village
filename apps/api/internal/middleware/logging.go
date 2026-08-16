@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"log/slog"
 	"net/http"
 	"time"
@@ -16,10 +17,7 @@ func Logging(
 	) {
 		start := time.Now()
 
-		rec := &responseRecorder{
-			ResponseWriter: w,
-			status:         http.StatusOK,
-		}
+		rec := httputil.NewResponseRecorder(w)
 
 		next.ServeHTTP(rec, r)
 
@@ -30,7 +28,7 @@ func Logging(
 			"request_id", GetRequestID(r.Context()),
 			"method", r.Method,
 			"route", routeLabel(r),
-			"status", rec.status,
+			"status", rec.Status,
 			"duration_ms", duration.Milliseconds(),
 		)
 	})

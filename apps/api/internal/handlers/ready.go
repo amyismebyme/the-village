@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"net/http"
 )
 
@@ -13,7 +14,7 @@ func ReadyHandler(w http.ResponseWriter, r *http.Request) {
 		Status: "ready",
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusOK,
 		response,

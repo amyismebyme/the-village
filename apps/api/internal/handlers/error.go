@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
@@ -23,19 +24,21 @@ func writeError(
 	code string,
 	message string,
 ) {
-	writeJSON(
+	response := errorResponse{
+		Error: errorBody{
+			Code:    code,
+			Message: message,
+		},
+	}
+
+	httputil.WriteJSON(
 		w,
 		status,
-		errorResponse{
-			Error: errorBody{
-				Code:    code,
-				Message: message,
-			},
-		},
+		response,
 	)
 }
 
-func writeCommunityServiceError(
+func writeServiceError(
 	w http.ResponseWriter,
 	err error,
 ) {
@@ -54,14 +57,6 @@ func writeCommunityServiceError(
 			http.StatusBadRequest,
 			"invalid_community",
 			"invalid community",
-		)
-
-	case errors.Is(err, service.ErrNilCommunity):
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"invalid_request",
-			"community is required",
 		)
 
 	case errors.Is(err, service.ErrCommunityAlreadyExists):
