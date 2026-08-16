@@ -5,41 +5,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 )
-
-type responseRecorder struct {
-	http.ResponseWriter
-	status      int
-	wroteHeader bool
-}
-
-func (r *responseRecorder) WriteHeader(code int) {
-	// net/http ignores subsequent WriteHeader calls after the first one.
-	if r.wroteHeader {
-		return
-	}
-
-	r.status = code
-	r.wroteHeader = true
-
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func (r *responseRecorder) Write(body []byte) (int, error) {
-	// net/http implicitly sends a 200 response when Write is called
-	// before WriteHeader.
-	if !r.wroteHeader {
-		r.WriteHeader(http.StatusOK)
-	}
-
-	return r.ResponseWriter.Write(body)
-}
-
-// Unwrap allows http.ResponseController and other stdlib functionality
-// to reach the original ResponseWriter capabilities.
-func (r *responseRecorder) Unwrap() http.ResponseWriter {
-	return r.ResponseWriter
-}
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(
@@ -49,10 +17,7 @@ func Middleware(next http.Handler) http.Handler {
 		RequestsInFlight.Inc()
 		defer RequestsInFlight.Dec()
 
-		rec := &responseRecorder{
-			ResponseWriter: w,
-			status:         http.StatusOK,
-		}
+		rec := httputil.NewResponseRecorder(w)
 
 		start := time.Now()
 
@@ -85,7 +50,7 @@ func Middleware(next http.Handler) http.Handler {
 			WithLabelValues(
 				r.Method,
 				route,
-				strconv.Itoa(rec.status),
+				strconv.Itoa(rec.Status),
 			).
 			Inc()
 

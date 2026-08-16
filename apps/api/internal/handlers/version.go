@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 )
 
@@ -21,7 +22,7 @@ func VersionHandler(w http.ResponseWriter, r *http.Request) {
 		),
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusOK,
 		response,

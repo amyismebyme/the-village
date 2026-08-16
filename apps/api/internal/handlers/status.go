@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 )
 
@@ -31,7 +32,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		GitCommit: appruntime.GitCommit,
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusOK,
 		response,

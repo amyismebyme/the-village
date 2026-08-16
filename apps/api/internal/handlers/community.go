@@ -1,9 +1,11 @@
 package handlers
 
 import (
-	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"net/http"
 	"strconv"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
+	"github.com/amyismebyme/the-village/apps/api/internal/model"
 )
 
 type createCommunityRequest struct {
@@ -57,11 +59,11 @@ func (h *Handler) CreateCommunity(
 		r.Context(),
 		community,
 	); err != nil {
-		writeCommunityServiceError(w, err)
+		writeServiceError(w, err)
 		return
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusCreated,
 		community,
@@ -96,7 +98,7 @@ func (h *Handler) ListCommunities(
 	)
 
 	if err != nil {
-		writeCommunityServiceError(w, err)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -121,14 +123,20 @@ func (h *Handler) ListCommunities(
 		Communities: communities,
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusOK,
 		response,
 	)
 }
 
-func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
+// GetCommunity handles:
+//
+//	GET /api/v1/communities/{id}
+func (h *Handler) GetCommunity(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
 
@@ -138,6 +146,7 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 			"method_not_allowed",
 			"method not allowed",
 		)
+
 		return
 	}
 
@@ -151,6 +160,7 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 			"invalid_id",
 			"invalid community id",
 		)
+
 		return
 	}
 
@@ -159,7 +169,7 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 		id,
 	)
 	if err != nil {
-		writeCommunityServiceError(w, err)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -170,16 +180,20 @@ func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {
 			"community_not_found",
 			"community not found",
 		)
+
 		return
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusOK,
 		community,
 	)
 }
 
+// UpdateCommunity handles:
+//
+//	PUT /api/v1/communities/{id}
 func (h *Handler) UpdateCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -193,6 +207,7 @@ func (h *Handler) UpdateCommunity(
 			"method_not_allowed",
 			"method not allowed",
 		)
+
 		return
 	}
 
@@ -206,13 +221,15 @@ func (h *Handler) UpdateCommunity(
 			"invalid_id",
 			"invalid community id",
 		)
+
 		return
 	}
 
 	var community model.Community
 
-	// Decode exactly once. decodeJSON should also reject
-	// unknown fields and multiple JSON objects/values.
+	// Decode exactly once.
+	// decodeJSON should reject unknown fields and
+	// multiple JSON values.
 	if err := decodeJSON(
 		w,
 		r,
@@ -224,6 +241,7 @@ func (h *Handler) UpdateCommunity(
 			"invalid_request",
 			err.Error(),
 		)
+
 		return
 	}
 
@@ -234,7 +252,7 @@ func (h *Handler) UpdateCommunity(
 		r.Context(),
 		&community,
 	); err != nil {
-		writeCommunityServiceError(w, err)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -244,7 +262,7 @@ func (h *Handler) UpdateCommunity(
 		id,
 	)
 	if err != nil {
-		writeCommunityServiceError(w, err)
+		writeServiceError(w, err)
 		return
 	}
 
@@ -255,10 +273,11 @@ func (h *Handler) UpdateCommunity(
 			"community_not_found",
 			"community not found",
 		)
+
 		return
 	}
 
-	writeJSON(
+	httputil.WriteJSON(
 		w,
 		http.StatusOK,
 		updated,
@@ -303,11 +322,7 @@ func (h *Handler) DeleteCommunity(
 		r.Context(),
 		id,
 	); err != nil {
-		writeCommunityServiceError(
-			w,
-			err,
-		)
-
+		writeServiceError(w, err)
 		return
 	}
 
