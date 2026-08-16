@@ -240,27 +240,27 @@ func (h *Handler) UpdateCommunity(
 	}
 
 	if err := h.communityService.Update(
-    	r.Context(),
-    	community,
-    ); err != nil {
-    	writeServiceError(w, err)
-    	return
-    }
+		r.Context(),
+		community,
+	); err != nil {
+		writeServiceError(w, err)
+		return
+	}
 
-    updatedCommunity, err := h.communityService.Get(
-    	r.Context(),
-    	id,
-    )
-    if err != nil {
-    	writeServiceError(w, err)
-    	return
-    }
+	updatedCommunity, err := h.communityService.Get(
+		r.Context(),
+		id,
+	)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
 
-    httputil.WriteJSON(
-    	w,
-    	http.StatusOK,
-    	newCommunityResponse(updatedCommunity),
-    )
+	httputil.WriteJSON(
+		w,
+		http.StatusOK,
+		newCommunityResponse(updatedCommunity),
+	)
 
 }
 
