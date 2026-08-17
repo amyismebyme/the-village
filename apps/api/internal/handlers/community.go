@@ -181,6 +181,10 @@ func (h *Handler) GetCommunity(
 // UpdateCommunity handles:
 //
 //	PUT /api/v1/communities/{id}
+//
+// UpdateCommunity handles:
+//
+//	PUT /api/v1/communities/{id}
 func (h *Handler) UpdateCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -247,21 +251,11 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	updatedCommunity, err := h.communityService.Get(
-		r.Context(),
-		id,
-	)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
 	httputil.WriteJSON(
 		w,
 		http.StatusOK,
-		newCommunityResponse(updatedCommunity),
+		newCommunityResponse(community),
 	)
-
 }
 
 // DeleteCommunity handles:

@@ -5,29 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/amyismebyme/the-village/apps/api/internal/model"
-	"github.com/amyismebyme/the-village/apps/api/internal/repository"
-	"github.com/amyismebyme/the-village/apps/api/internal/service"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/model"
+	"github.com/amyismebyme/the-village/apps/api/internal/repository"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
-
-type testCommunityResponse struct {
-	ID             int64     `json:"id"`
-	Name           string    `json:"name"`
-	Slug           string    `json:"slug"`
-	Description    string    `json:"description,omitempty"`
-	ExternalSource string    `json:"external_source,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type testCommunityListResponse struct {
-	Communities []testCommunityResponse `json:"communities"`
-}
 
 // -----------------------------------------------------------------------------
 // Mock Community Service
@@ -116,6 +102,78 @@ func (m *communityServiceMock) Delete(
 var _ service.CommunityService = (*communityServiceMock)(nil)
 
 // -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+func newCommunityRequest(
+	method string,
+	target string,
+	body string,
+) *http.Request {
+	req := httptest.NewRequest(
+		method,
+		target,
+		strings.NewReader(body),
+	)
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	return req
+}
+
+func setCommunityID(
+	req *http.Request,
+	id string,
+) {
+	req.SetPathValue("id", id)
+}
+
+func decodeCommunityResponse(
+	t *testing.T,
+	recorder *httptest.ResponseRecorder,
+) communityResponse {
+	t.Helper()
+
+	var response communityResponse
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode community response: %v",
+			err,
+		)
+	}
+
+	return response
+}
+
+func decodeCommunityListResponse(
+	t *testing.T,
+	recorder *httptest.ResponseRecorder,
+) []communityResponse {
+	t.Helper()
+
+	var response struct {
+		Communities []communityResponse `json:"communities"`
+	}
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode community list response: %v",
+			err,
+		)
+	}
+
+	return response.Communities
+}
+
+// -----------------------------------------------------------------------------
 // Handler constructor
 // -----------------------------------------------------------------------------
 
@@ -165,15 +223,10 @@ func TestCreateCommunity(t *testing.T) {
 		"external_source": "manual"
 	}`
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPost,
 		"/api/v1/communities",
-		strings.NewReader(body),
-	)
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
+		body,
 	)
 
 	recorder := httptest.NewRecorder()
@@ -195,6 +248,13 @@ func TestCreateCommunity(t *testing.T) {
 		t.Fatal("expected community to be passed to service")
 	}
 
+	if received.ID != 1 {
+		t.Fatalf(
+			"expected service-populated ID 1, got %d",
+			received.ID,
+		)
+	}
+
 	if received.Name != "Toronto Men" {
 		t.Fatalf(
 			"expected name %q, got %q",
@@ -210,11 +270,36 @@ func TestCreateCommunity(t *testing.T) {
 			received.Slug,
 		)
 	}
-}
 
-// -----------------------------------------------------------------------------
-// POST malformed JSON
-// -----------------------------------------------------------------------------
+	response := decodeCommunityResponse(
+		t,
+		recorder,
+	)
+
+	if response.ID != received.ID {
+		t.Fatalf(
+			"expected response ID %d, got %d",
+			received.ID,
+			response.ID,
+		)
+	}
+
+	if response.Name != received.Name {
+		t.Fatalf(
+			"expected response name %q, got %q",
+			received.Name,
+			response.Name,
+		)
+	}
+
+	if response.Slug != received.Slug {
+		t.Fatalf(
+			"expected response slug %q, got %q",
+			received.Slug,
+			response.Slug,
+		)
+	}
+}
 
 func TestCreateCommunityMalformedJSON(t *testing.T) {
 	t.Parallel()
@@ -233,15 +318,10 @@ func TestCreateCommunityMalformedJSON(t *testing.T) {
 
 	handler := NewHandler(mockService)
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPost,
 		"/api/v1/communities",
-		strings.NewReader(`{"name":`),
-	)
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
+		`{"name":`,
 	)
 
 	recorder := httptest.NewRecorder()
@@ -265,10 +345,6 @@ func TestCreateCommunityMalformedJSON(t *testing.T) {
 		)
 	}
 }
-
-// -----------------------------------------------------------------------------
-// POST invalid community
-// -----------------------------------------------------------------------------
 
 func TestCreateCommunityValidationError(t *testing.T) {
 	t.Parallel()
@@ -308,15 +384,10 @@ func TestCreateCommunityValidationError(t *testing.T) {
 		"description": ""
 	}`
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPost,
 		"/api/v1/communities",
-		strings.NewReader(body),
-	)
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
+		body,
 	)
 
 	recorder := httptest.NewRecorder()
@@ -335,8 +406,185 @@ func TestCreateCommunityValidationError(t *testing.T) {
 	}
 
 	if !serviceCalled {
+		t.Fatal("expected service to be called")
+	}
+}
+
+func TestCreateCommunityDuplicate(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		createFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			return service.ErrCommunityAlreadyExists
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men",
+		"slug": "toronto-men"
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPost,
+		"/api/v1/communities",
+		body,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	handler.CreateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusConflict,
+			recorder.Code,
+		)
+	}
+}
+
+func TestCreateCommunityUnknownField(t *testing.T) {
+	t.Parallel()
+
+	serviceCalled := false
+
+	mockService := &communityServiceMock{
+		createFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			serviceCalled = true
+			return nil
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men",
+		"slug": "toronto-men",
+		"description": "A community for men in Toronto.",
+		"unexpected": "field"
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPost,
+		"/api/v1/communities",
+		body,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	handler.CreateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
+		)
+	}
+
+	if serviceCalled {
 		t.Fatal(
-			"expected service to be called",
+			"expected service not to be called for unknown field",
+		)
+	}
+}
+
+func TestCreateCommunityMultipleJSONValues(t *testing.T) {
+	t.Parallel()
+
+	serviceCalled := false
+
+	mockService := &communityServiceMock{
+		createFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			serviceCalled = true
+			return nil
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men",
+		"slug": "toronto-men"
+	} {
+		"name": "Second Community"
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPost,
+		"/api/v1/communities",
+		body,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	handler.CreateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
+		)
+	}
+
+	if serviceCalled {
+		t.Fatal(
+			"expected service not to be called for multiple JSON values",
+		)
+	}
+}
+
+func TestCreateCommunityMissingContentType(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men",
+		"slug": "toronto-men"
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/communities",
+		strings.NewReader(body),
+	)
+
+	recorder := httptest.NewRecorder()
+
+	handler.CreateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
 		)
 	}
 }
@@ -396,44 +644,48 @@ func TestListCommunities(t *testing.T) {
 		)
 	}
 
-	var response testCommunityListResponse
+	communities := decodeCommunityListResponse(
+		t,
+		recorder,
+	)
 
-	if err := json.NewDecoder(
-		recorder.Body,
-	).Decode(&response); err != nil {
-		t.Fatalf(
-			"failed to decode response: %v",
-			err,
-		)
-	}
-
-	if len(response.Communities) != 2 {
+	if len(communities) != 2 {
 		t.Fatalf(
 			"expected 2 communities, got %d",
-			len(response.Communities),
+			len(communities),
 		)
 	}
 
-	if response.Communities[0].Slug != "toronto-men" {
+	if communities[0].ID != 1 {
+		t.Fatalf(
+			"expected first ID 1, got %d",
+			communities[0].ID,
+		)
+	}
+
+	if communities[0].Slug != "toronto-men" {
 		t.Fatalf(
 			"expected first slug %q, got %q",
 			"toronto-men",
-			response.Communities[0].Slug,
+			communities[0].Slug,
 		)
 	}
 
-	if response.Communities[1].Slug != "mississauga-men" {
+	if communities[1].ID != 2 {
+		t.Fatalf(
+			"expected second ID 2, got %d",
+			communities[1].ID,
+		)
+	}
+
+	if communities[1].Slug != "mississauga-men" {
 		t.Fatalf(
 			"expected second slug %q, got %q",
 			"mississauga-men",
-			response.Communities[1].Slug,
+			communities[1].Slug,
 		)
 	}
 }
-
-// -----------------------------------------------------------------------------
-// GET /api/v1/communities - empty result
-// -----------------------------------------------------------------------------
 
 func TestListCommunitiesEmpty(t *testing.T) {
 	t.Parallel()
@@ -469,34 +721,83 @@ func TestListCommunitiesEmpty(t *testing.T) {
 		)
 	}
 
-	var response testCommunityListResponse
+	communities := decodeCommunityListResponse(
+		t,
+		recorder,
+	)
 
-	if err := json.NewDecoder(
-		recorder.Body,
-	).Decode(&response); err != nil {
-		t.Fatalf(
-			"failed to decode response: %v",
-			err,
-		)
-	}
-
-	if response.Communities == nil {
+	if communities == nil {
 		t.Fatal(
 			"expected communities to be an empty array, got nil",
 		)
 	}
 
-	if len(response.Communities) != 0 {
+	if len(communities) != 0 {
 		t.Fatalf(
 			"expected 0 communities, got %d",
-			len(response.Communities),
+			len(communities),
 		)
 	}
 }
 
-// -----------------------------------------------------------------------------
-// GET /api/v1/communities - service failure
-// -----------------------------------------------------------------------------
+func TestListCommunitiesNilEntriesAreSkipped(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		listFunc: func(
+			ctx context.Context,
+		) ([]*model.Community, error) {
+			return []*model.Community{
+				{
+					ID:   1,
+					Name: "Toronto Men",
+					Slug: "toronto-men",
+				},
+				nil,
+				{
+					ID:   2,
+					Name: "Mississauga Men",
+					Slug: "mississauga-men",
+				},
+			}, nil
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/communities",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+
+	handler.ListCommunities(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusOK,
+			recorder.Code,
+		)
+	}
+
+	communities := decodeCommunityListResponse(
+		t,
+		recorder,
+	)
+
+	if len(communities) != 2 {
+		t.Fatalf(
+			"expected 2 communities after skipping nil entry, got %d",
+			len(communities),
+		)
+	}
+}
 
 func TestListCommunitiesServiceError(t *testing.T) {
 	t.Parallel()
@@ -529,67 +830,6 @@ func TestListCommunitiesServiceError(t *testing.T) {
 			"expected status %d, got %d",
 			http.StatusInternalServerError,
 			recorder.Code,
-		)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// POST /api/v1/communities - unknown field
-// -----------------------------------------------------------------------------
-
-func TestCreateCommunityUnknownField(t *testing.T) {
-	t.Parallel()
-
-	serviceCalled := false
-
-	mockService := &communityServiceMock{
-		createFunc: func(
-			ctx context.Context,
-			community *model.Community,
-		) error {
-			serviceCalled = true
-			return nil
-		},
-	}
-
-	handler := NewHandler(mockService)
-
-	body := `{
-		"name": "Toronto Men",
-		"slug": "toronto-men",
-		"description": "A community for men in Toronto.",
-		"unexpected": "field"
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/communities",
-		strings.NewReader(body),
-	)
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
-	)
-
-	recorder := httptest.NewRecorder()
-
-	handler.CreateCommunity(
-		recorder,
-		req,
-	)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusBadRequest,
-			recorder.Code,
-		)
-	}
-
-	if serviceCalled {
-		t.Fatal(
-			"expected service not to be called for unknown field",
 		)
 	}
 }
@@ -629,7 +869,7 @@ func TestGetCommunity(t *testing.T) {
 		nil,
 	)
 
-	req.SetPathValue("id", "1")
+	setCommunityID(req, "1")
 
 	recorder := httptest.NewRecorder()
 
@@ -653,16 +893,10 @@ func TestGetCommunity(t *testing.T) {
 		)
 	}
 
-	var response testCommunityResponse
-
-	if err := json.NewDecoder(
-		recorder.Body,
-	).Decode(&response); err != nil {
-		t.Fatalf(
-			"failed to decode response: %v",
-			err,
-		)
-	}
+	response := decodeCommunityResponse(
+		t,
+		recorder,
+	)
 
 	if response.ID != expected.ID {
 		t.Fatalf(
@@ -687,11 +921,23 @@ func TestGetCommunity(t *testing.T) {
 			response.Slug,
 		)
 	}
-}
 
-// -----------------------------------------------------------------------------
-// GET /api/v1/communities/:id - invalid ID
-// -----------------------------------------------------------------------------
+	if response.Description != expected.Description {
+		t.Fatalf(
+			"expected description %q, got %q",
+			expected.Description,
+			response.Description,
+		)
+	}
+
+	if response.ExternalSource != expected.ExternalSource {
+		t.Fatalf(
+			"expected external source %q, got %q",
+			expected.ExternalSource,
+			response.ExternalSource,
+		)
+	}
+}
 
 func TestGetCommunityInvalidID(t *testing.T) {
 	t.Parallel()
@@ -728,7 +974,7 @@ func TestGetCommunityInvalidID(t *testing.T) {
 				nil,
 			)
 
-			req.SetPathValue("id", id)
+			setCommunityID(req, id)
 
 			recorder := httptest.NewRecorder()
 
@@ -754,10 +1000,6 @@ func TestGetCommunityInvalidID(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// GET /api/v1/communities/:id - not found
-// -----------------------------------------------------------------------------
-
 func TestGetCommunityNotFound(t *testing.T) {
 	t.Parallel()
 
@@ -778,7 +1020,7 @@ func TestGetCommunityNotFound(t *testing.T) {
 		nil,
 	)
 
-	req.SetPathValue("id", "999")
+	setCommunityID(req, "999")
 
 	recorder := httptest.NewRecorder()
 
@@ -796,69 +1038,52 @@ func TestGetCommunityNotFound(t *testing.T) {
 	}
 }
 
-func TestUpdateCommunityDuplicate(t *testing.T) {
+func TestGetCommunityNilResult(t *testing.T) {
 	t.Parallel()
 
 	mockService := &communityServiceMock{
-		updateFunc: func(
+		getFunc: func(
 			ctx context.Context,
-			community *model.Community,
-		) error {
-			return service.ErrCommunityAlreadyExists
+			id int64,
+		) (*model.Community, error) {
+			return nil, nil
 		},
 	}
 
 	handler := NewHandler(mockService)
 
-	body := `{
-    "name": "Toronto Men's Community",
-    "slug": "toronto-men",
-    "description": "Updated description.",
-    "external_source": "manual"
-}`
-
 	req := httptest.NewRequest(
-		http.MethodPut,
-		"/api/v1/communities/1",
-		strings.NewReader(body),
+		http.MethodGet,
+		"/api/v1/communities/999",
+		nil,
 	)
 
-	req.SetPathValue("id", "1")
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
-	)
+	setCommunityID(req, "999")
 
 	recorder := httptest.NewRecorder()
 
-	handler.UpdateCommunity(
+	handler.GetCommunity(
 		recorder,
 		req,
 	)
 
-	if recorder.Code != http.StatusConflict {
+	if recorder.Code != http.StatusNotFound {
 		t.Fatalf(
 			"expected status %d, got %d",
-			http.StatusConflict,
+			http.StatusNotFound,
 			recorder.Code,
 		)
 	}
 }
 
+// -----------------------------------------------------------------------------
+// PUT /api/v1/communities/:id
+// -----------------------------------------------------------------------------
+
 func TestUpdateCommunity(t *testing.T) {
 	t.Parallel()
 
-	updatedCommunity := &model.Community{
-		ID:             1,
-		Name:           "Toronto Men's Community",
-		Slug:           "toronto-men",
-		Description:    "Updated description.",
-		ExternalSource: "manual",
-	}
-
 	var received *model.Community
-	var getCalledWith int64
 
 	mockService := &communityServiceMock{
 		updateFunc: func(
@@ -866,14 +1091,11 @@ func TestUpdateCommunity(t *testing.T) {
 			community *model.Community,
 		) error {
 			received = community
+
+			// Simulate values populated by the service/repository.
+			community.ID = 1
+
 			return nil
-		},
-		getFunc: func(
-			ctx context.Context,
-			id int64,
-		) (*model.Community, error) {
-			getCalledWith = id
-			return updatedCommunity, nil
 		},
 	}
 
@@ -886,17 +1108,20 @@ func TestUpdateCommunity(t *testing.T) {
 		"external_source": "manual"
 	}`
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPut,
 		"/api/v1/communities/1",
-		strings.NewReader(body),
+		body,
 	)
-	req.SetPathValue("id", "1")
-	req.Header.Set("Content-Type", "application/json")
+
+	setCommunityID(req, "1")
 
 	recorder := httptest.NewRecorder()
 
-	handler.UpdateCommunity(recorder, req)
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf(
@@ -907,69 +1132,78 @@ func TestUpdateCommunity(t *testing.T) {
 	}
 
 	if received == nil {
-		t.Fatal("expected community to be passed to service")
+		t.Fatal(
+			"expected community to be passed to service",
+		)
 	}
 
 	if received.ID != 1 {
-		t.Fatalf("expected community ID 1, got %d", received.ID)
+		t.Fatalf(
+			"expected community ID 1, got %d",
+			received.ID,
+		)
 	}
 
 	if received.Name != "Toronto Men's Community" {
-		t.Fatalf("unexpected name %q", received.Name)
+		t.Fatalf(
+			"unexpected name %q",
+			received.Name,
+		)
 	}
 
 	if received.Slug != "toronto-men" {
-		t.Fatalf("unexpected slug %q", received.Slug)
+		t.Fatalf(
+			"unexpected slug %q",
+			received.Slug,
+		)
 	}
 
-	if getCalledWith != 1 {
-		t.Fatalf("expected Get to be called with ID 1, got %d", getCalledWith)
+	if received.Description != "Updated description." {
+		t.Fatalf(
+			"unexpected description %q",
+			received.Description,
+		)
 	}
 
-	var response testCommunityResponse
-
-	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
+	if received.ExternalSource != "manual" {
+		t.Fatalf(
+			"unexpected external source %q",
+			received.ExternalSource,
+		)
 	}
 
-	if response.ID != updatedCommunity.ID {
+	response := decodeCommunityResponse(
+		t,
+		recorder,
+	)
+
+	if response.ID != received.ID {
 		t.Fatalf(
 			"expected response ID %d, got %d",
-			updatedCommunity.ID,
+			received.ID,
 			response.ID,
 		)
 	}
 
-	if response.Name != updatedCommunity.Name {
+	if response.Name != received.Name {
 		t.Fatalf(
 			"expected response name %q, got %q",
-			updatedCommunity.Name,
+			received.Name,
 			response.Name,
+		)
+	}
+
+	if response.Slug != received.Slug {
+		t.Fatalf(
+			"expected response slug %q, got %q",
+			received.Slug,
+			response.Slug,
 		)
 	}
 }
 
 func TestUpdateCommunityInvalidID(t *testing.T) {
 	t.Parallel()
-
-	serviceCalled := false
-
-	mockService := &communityServiceMock{
-		updateFunc: func(
-			ctx context.Context,
-			community *model.Community,
-		) error {
-			serviceCalled = true
-			return nil
-		},
-	}
-
-	handler := NewHandler(mockService)
-
-	body := `{
-		"name": "Toronto Men",
-		"slug": "toronto-men"
-	}`
 
 	testCases := []string{
 		"abc",
@@ -981,16 +1215,41 @@ func TestUpdateCommunityInvalidID(t *testing.T) {
 		id := id
 
 		t.Run(id, func(t *testing.T) {
-			req := httptest.NewRequest(
+			t.Parallel()
+
+			serviceCalled := false
+
+			mockService := &communityServiceMock{
+				updateFunc: func(
+					ctx context.Context,
+					community *model.Community,
+				) error {
+					serviceCalled = true
+					return nil
+				},
+			}
+
+			handler := NewHandler(mockService)
+
+			body := `{
+				"name": "Toronto Men",
+				"slug": "toronto-men"
+			}`
+
+			req := newCommunityRequest(
 				http.MethodPut,
 				"/api/v1/communities/"+id,
-				strings.NewReader(body),
+				body,
 			)
-			req.SetPathValue("id", id)
+
+			setCommunityID(req, id)
 
 			recorder := httptest.NewRecorder()
 
-			handler.UpdateCommunity(recorder, req)
+			handler.UpdateCommunity(
+				recorder,
+				req,
+			)
 
 			if recorder.Code != http.StatusBadRequest {
 				t.Fatalf(
@@ -999,11 +1258,13 @@ func TestUpdateCommunityInvalidID(t *testing.T) {
 					recorder.Code,
 				)
 			}
-		})
-	}
 
-	if serviceCalled {
-		t.Fatal("service should not be called for invalid IDs")
+			if serviceCalled {
+				t.Fatal(
+					"service should not be called for invalid ID",
+				)
+			}
+		})
 	}
 }
 
@@ -1024,16 +1285,20 @@ func TestUpdateCommunityMalformedJSON(t *testing.T) {
 
 	handler := NewHandler(mockService)
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPut,
 		"/api/v1/communities/1",
-		strings.NewReader(`{"name":`),
+		`{"name":`,
 	)
-	req.SetPathValue("id", "1")
+
+	setCommunityID(req, "1")
 
 	recorder := httptest.NewRecorder()
 
-	handler.UpdateCommunity(recorder, req)
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf(
@@ -1044,279 +1309,8 @@ func TestUpdateCommunityMalformedJSON(t *testing.T) {
 	}
 
 	if serviceCalled {
-		t.Fatal("service should not be called for malformed JSON")
-	}
-}
-
-func TestUpdateCommunityValidationFailure(t *testing.T) {
-	t.Parallel()
-
-	mockService := &communityServiceMock{
-		updateFunc: func(
-			ctx context.Context,
-			community *model.Community,
-		) error {
-			return service.ErrInvalidCommunity
-		},
-	}
-
-	handler := NewHandler(mockService)
-
-	body := `{
-		"name": "",
-		"slug": ""
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPut,
-		"/api/v1/communities/1",
-		strings.NewReader(body),
-	)
-	req.SetPathValue("id", "1")
-
-	recorder := httptest.NewRecorder()
-
-	handler.UpdateCommunity(recorder, req)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusBadRequest,
-			recorder.Code,
-		)
-	}
-}
-
-func TestUpdateCommunityNotFound(t *testing.T) {
-	t.Parallel()
-
-	mockService := &communityServiceMock{
-		updateFunc: func(
-			ctx context.Context,
-			community *model.Community,
-		) error {
-			return repository.ErrNotFound
-		},
-	}
-
-	handler := NewHandler(mockService)
-
-	body := `{
-    "name": "Toronto Men's Community",
-    "slug": "toronto-men",
-    "description": "Updated description.",
-    "external_source": "manual"
-}`
-
-	req := httptest.NewRequest(
-		http.MethodPut,
-		"/api/v1/communities/999",
-		strings.NewReader(body),
-	)
-
-	req.SetPathValue("id", "999")
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
-	)
-
-	recorder := httptest.NewRecorder()
-
-	handler.UpdateCommunity(
-		recorder,
-		req,
-	)
-
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusNotFound,
-			recorder.Code,
-		)
-	}
-
-}
-
-func TestDeleteCommunity(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		mockService := &communityServiceMock{}
-
-		handler := NewHandler(mockService)
-
-		req := httptest.NewRequest(
-			http.MethodDelete,
-			"/api/v1/communities/1",
-			nil,
-		)
-
-		req.SetPathValue("id", "1")
-
-		recorder := httptest.NewRecorder()
-
-		handler.DeleteCommunity(
-			recorder,
-			req,
-		)
-
-		if recorder.Code != http.StatusNoContent {
-			t.Fatalf(
-				"expected status %d, got %d",
-				http.StatusNoContent,
-				recorder.Code,
-			)
-		}
-
-		if recorder.Body.Len() != 0 {
-			t.Fatalf(
-				"expected empty response body, got %q",
-				recorder.Body.String(),
-			)
-		}
-	})
-
-	t.Run("invalid ID", func(t *testing.T) {
-		testCases := []string{
-			"abc",
-			"0",
-			"-1",
-		}
-
-		for _, id := range testCases {
-			t.Run(id, func(t *testing.T) {
-				mockService := &communityServiceMock{}
-
-				handler := NewHandler(mockService)
-
-				req := httptest.NewRequest(
-					http.MethodDelete,
-					"/api/v1/communities/"+id,
-					nil,
-				)
-
-				req.SetPathValue("id", id)
-
-				recorder := httptest.NewRecorder()
-
-				handler.DeleteCommunity(
-					recorder,
-					req,
-				)
-
-				if recorder.Code != http.StatusBadRequest {
-					t.Fatalf(
-						"expected status %d, got %d",
-						http.StatusBadRequest,
-						recorder.Code,
-					)
-				}
-			})
-		}
-	})
-
-	t.Run("not found", func(t *testing.T) {
-		mockService := &communityServiceMock{
-			deleteFunc: func(
-				ctx context.Context,
-				id int64,
-			) error {
-				return fmt.Errorf(
-					"community service: delete community %d: %w",
-					id,
-					repository.ErrNotFound,
-				)
-			},
-		}
-
-		handler := NewHandler(mockService)
-
-		req := httptest.NewRequest(
-			http.MethodDelete,
-			"/api/v1/communities/999",
-			nil,
-		)
-
-		req.SetPathValue("id", "999")
-
-		recorder := httptest.NewRecorder()
-
-		handler.DeleteCommunity(
-			recorder,
-			req,
-		)
-
-		if recorder.Code != http.StatusNotFound {
-			t.Fatalf(
-				"expected status %d, got %d",
-				http.StatusNotFound,
-				recorder.Code,
-			)
-		}
-	})
-
-	t.Run("database failure", func(t *testing.T) {
-		mockService := &communityServiceMock{
-			deleteFunc: func(ctx context.Context, id int64) error {
-				//return repository.ErrNotFound enable once everyting  is up
-				return errors.New("database unavailable")
-
-			},
-		}
-
-		handler := NewHandler(mockService)
-
-		req := httptest.NewRequest(
-			http.MethodDelete,
-			"/api/v1/communities/1",
-			nil,
-		)
-
-		req.SetPathValue("id", "1")
-
-		recorder := httptest.NewRecorder()
-
-		handler.DeleteCommunity(
-			recorder,
-			req,
-		)
-
-		if recorder.Code != http.StatusInternalServerError {
-			t.Fatalf(
-				"expected status %d, got %d",
-				http.StatusInternalServerError,
-				recorder.Code,
-			)
-		}
-	})
-}
-
-func TestCreateCommunityMissingContentType(t *testing.T) {
-	mockService := &communityServiceMock{}
-
-	handler := NewHandler(mockService)
-
-	body := strings.NewReader(`{
-		"name": "Toronto Men",
-		"slug": "toronto-men",
-		"description": "A community for men in Toronto.",
-		"external_source": "manual"
-	}`)
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/communities",
-		body,
-	)
-
-	rec := httptest.NewRecorder()
-
-	handler.CreateCommunity(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusBadRequest,
-			rec.Code,
+		t.Fatal(
+			"service should not be called for malformed JSON",
 		)
 	}
 }
@@ -1344,17 +1338,20 @@ func TestUpdateCommunityUnknownField(t *testing.T) {
 		"banana": "hello"
 	}`
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPut,
 		"/api/v1/communities/1",
-		strings.NewReader(body),
+		body,
 	)
-	req.SetPathValue("id", "1")
-	req.Header.Set("Content-Type", "application/json")
+
+	setCommunityID(req, "1")
 
 	recorder := httptest.NewRecorder()
 
-	handler.UpdateCommunity(recorder, req)
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf(
@@ -1365,7 +1362,9 @@ func TestUpdateCommunityUnknownField(t *testing.T) {
 	}
 
 	if serviceCalled {
-		t.Fatal("expected service not to be called for unknown JSON field")
+		t.Fatal(
+			"expected service not to be called for unknown JSON field",
+		)
 	}
 }
 
@@ -1393,17 +1392,20 @@ func TestUpdateCommunityMultipleJSONValues(t *testing.T) {
 		"name": "Second Community"
 	}`
 
-	req := httptest.NewRequest(
+	req := newCommunityRequest(
 		http.MethodPut,
 		"/api/v1/communities/1",
-		strings.NewReader(body),
+		body,
 	)
-	req.SetPathValue("id", "1")
-	req.Header.Set("Content-Type", "application/json")
+
+	setCommunityID(req, "1")
 
 	recorder := httptest.NewRecorder()
 
-	handler.UpdateCommunity(recorder, req)
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf(
@@ -1414,8 +1416,388 @@ func TestUpdateCommunityMultipleJSONValues(t *testing.T) {
 	}
 
 	if serviceCalled {
-		t.Fatal("expected service not to be called for multiple JSON values")
+		t.Fatal(
+			"expected service not to be called for multiple JSON values",
+		)
 	}
+}
+
+func TestUpdateCommunityValidationFailure(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		updateFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			return service.ErrInvalidCommunity
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "",
+		"slug": ""
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPut,
+		"/api/v1/communities/1",
+		body,
+	)
+
+	setCommunityID(req, "1")
+
+	recorder := httptest.NewRecorder()
+
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
+		)
+	}
+}
+
+func TestUpdateCommunityDuplicate(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		updateFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			return service.ErrCommunityAlreadyExists
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men's Community",
+		"slug": "toronto-men",
+		"description": "Updated description.",
+		"external_source": "manual"
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPut,
+		"/api/v1/communities/1",
+		body,
+	)
+
+	setCommunityID(req, "1")
+
+	recorder := httptest.NewRecorder()
+
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusConflict,
+			recorder.Code,
+		)
+	}
+}
+
+func TestUpdateCommunityNotFound(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		updateFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			return repository.ErrNotFound
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men's Community",
+		"slug": "toronto-men",
+		"description": "Updated description.",
+		"external_source": "manual"
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPut,
+		"/api/v1/communities/999",
+		body,
+	)
+
+	setCommunityID(req, "999")
+
+	recorder := httptest.NewRecorder()
+
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusNotFound,
+			recorder.Code,
+		)
+	}
+}
+
+func TestUpdateCommunityDatabaseFailure(t *testing.T) {
+	t.Parallel()
+
+	mockService := &communityServiceMock{
+		updateFunc: func(
+			ctx context.Context,
+			community *model.Community,
+		) error {
+			return errors.New("database unavailable")
+		},
+	}
+
+	handler := NewHandler(mockService)
+
+	body := `{
+		"name": "Toronto Men's Community",
+		"slug": "toronto-men"
+	}`
+
+	req := newCommunityRequest(
+		http.MethodPut,
+		"/api/v1/communities/1",
+		body,
+	)
+
+	setCommunityID(req, "1")
+
+	recorder := httptest.NewRecorder()
+
+	handler.UpdateCommunity(
+		recorder,
+		req,
+	)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusInternalServerError,
+			recorder.Code,
+		)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// DELETE /api/v1/communities/:id
+// -----------------------------------------------------------------------------
+
+func TestDeleteCommunity(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		var deletedID int64
+
+		mockService := &communityServiceMock{
+			deleteFunc: func(
+				ctx context.Context,
+				id int64,
+			) error {
+				deletedID = id
+				return nil
+			},
+		}
+
+		handler := NewHandler(mockService)
+
+		req := httptest.NewRequest(
+			http.MethodDelete,
+			"/api/v1/communities/1",
+			nil,
+		)
+
+		setCommunityID(req, "1")
+
+		recorder := httptest.NewRecorder()
+
+		handler.DeleteCommunity(
+			recorder,
+			req,
+		)
+
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf(
+				"expected status %d, got %d",
+				http.StatusNoContent,
+				recorder.Code,
+			)
+		}
+
+		if deletedID != 1 {
+			t.Fatalf(
+				"expected delete ID 1, got %d",
+				deletedID,
+			)
+		}
+
+		if recorder.Body.Len() != 0 {
+			t.Fatalf(
+				"expected empty response body, got %q",
+				recorder.Body.String(),
+			)
+		}
+	})
+
+	t.Run("invalid ID", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{
+			"abc",
+			"0",
+			"-1",
+		}
+
+		for _, id := range testCases {
+			id := id
+
+			t.Run(id, func(t *testing.T) {
+				t.Parallel()
+
+				serviceCalled := false
+
+				mockService := &communityServiceMock{
+					deleteFunc: func(
+						ctx context.Context,
+						id int64,
+					) error {
+						serviceCalled = true
+						return nil
+					},
+				}
+
+				handler := NewHandler(mockService)
+
+				req := httptest.NewRequest(
+					http.MethodDelete,
+					"/api/v1/communities/"+id,
+					nil,
+				)
+
+				setCommunityID(req, id)
+
+				recorder := httptest.NewRecorder()
+
+				handler.DeleteCommunity(
+					recorder,
+					req,
+				)
+
+				if recorder.Code != http.StatusBadRequest {
+					t.Fatalf(
+						"expected status %d, got %d",
+						http.StatusBadRequest,
+						recorder.Code,
+					)
+				}
+
+				if serviceCalled {
+					t.Fatal(
+						"expected service not to be called for invalid ID",
+					)
+				}
+			})
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
+		mockService := &communityServiceMock{
+			deleteFunc: func(
+				ctx context.Context,
+				id int64,
+			) error {
+				return fmt.Errorf(
+					"community service: delete community %d: %w",
+					id,
+					repository.ErrNotFound,
+				)
+			},
+		}
+
+		handler := NewHandler(mockService)
+
+		req := httptest.NewRequest(
+			http.MethodDelete,
+			"/api/v1/communities/999",
+			nil,
+		)
+
+		setCommunityID(req, "999")
+
+		recorder := httptest.NewRecorder()
+
+		handler.DeleteCommunity(
+			recorder,
+			req,
+		)
+
+		if recorder.Code != http.StatusNotFound {
+			t.Fatalf(
+				"expected status %d, got %d",
+				http.StatusNotFound,
+				recorder.Code,
+			)
+		}
+	})
+
+	t.Run("database failure", func(t *testing.T) {
+		t.Parallel()
+
+		mockService := &communityServiceMock{
+			deleteFunc: func(
+				ctx context.Context,
+				id int64,
+			) error {
+				return errors.New("database unavailable")
+			},
+		}
+
+		handler := NewHandler(mockService)
+
+		req := httptest.NewRequest(
+			http.MethodDelete,
+			"/api/v1/communities/1",
+			nil,
+		)
+
+		setCommunityID(req, "1")
+
+		recorder := httptest.NewRecorder()
+
+		handler.DeleteCommunity(
+			recorder,
+			req,
+		)
+
+		if recorder.Code != http.StatusInternalServerError {
+			t.Fatalf(
+				"expected status %d, got %d",
+				http.StatusInternalServerError,
+				recorder.Code,
+			)
+		}
+	})
 }
 
 // -----------------------------------------------------------------------------
@@ -1447,7 +1829,10 @@ func TestCreateCommunityMethodNotAllowed(t *testing.T) {
 
 			recorder := httptest.NewRecorder()
 
-			handler.CreateCommunity(recorder, req)
+			handler.CreateCommunity(
+				recorder,
+				req,
+			)
 
 			if recorder.Code != http.StatusMethodNotAllowed {
 				t.Fatalf(
@@ -1493,7 +1878,10 @@ func TestListCommunitiesMethodNotAllowed(t *testing.T) {
 
 			recorder := httptest.NewRecorder()
 
-			handler.ListCommunities(recorder, req)
+			handler.ListCommunities(
+				recorder,
+				req,
+			)
 
 			if recorder.Code != http.StatusMethodNotAllowed {
 				t.Fatalf(
@@ -1537,11 +1925,14 @@ func TestGetCommunityMethodNotAllowed(t *testing.T) {
 				nil,
 			)
 
-			req.SetPathValue("id", "1")
+			setCommunityID(req, "1")
 
 			recorder := httptest.NewRecorder()
 
-			handler.GetCommunity(recorder, req)
+			handler.GetCommunity(
+				recorder,
+				req,
+			)
 
 			if recorder.Code != http.StatusMethodNotAllowed {
 				t.Fatalf(
@@ -1585,11 +1976,14 @@ func TestUpdateCommunityMethodNotAllowed(t *testing.T) {
 				nil,
 			)
 
-			req.SetPathValue("id", "1")
+			setCommunityID(req, "1")
 
 			recorder := httptest.NewRecorder()
 
-			handler.UpdateCommunity(recorder, req)
+			handler.UpdateCommunity(
+				recorder,
+				req,
+			)
 
 			if recorder.Code != http.StatusMethodNotAllowed {
 				t.Fatalf(
@@ -1633,11 +2027,14 @@ func TestDeleteCommunityMethodNotAllowed(t *testing.T) {
 				nil,
 			)
 
-			req.SetPathValue("id", "1")
+			setCommunityID(req, "1")
 
 			recorder := httptest.NewRecorder()
 
-			handler.DeleteCommunity(recorder, req)
+			handler.DeleteCommunity(
+				recorder,
+				req,
+			)
 
 			if recorder.Code != http.StatusMethodNotAllowed {
 				t.Fatalf(
@@ -1655,61 +2052,5 @@ func TestDeleteCommunityMethodNotAllowed(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func TestUpdateCommunityGetFailure(t *testing.T) {
-	t.Parallel()
-
-	mockService := &communityServiceMock{
-		updateFunc: func(
-			ctx context.Context,
-			community *model.Community,
-		) error {
-			return nil
-		},
-		getFunc: func(
-			ctx context.Context,
-			id int64,
-		) (*model.Community, error) {
-			return nil, errors.New("database unavailable")
-		},
-	}
-
-	handler := NewHandler(mockService)
-
-	body := `{
-		"name": "Toronto Men's Community",
-		"slug": "toronto-men",
-		"description": "Updated description.",
-		"external_source": "manual"
-	}`
-
-	req := httptest.NewRequest(
-		http.MethodPut,
-		"/api/v1/communities/1",
-		strings.NewReader(body),
-	)
-
-	req.SetPathValue("id", "1")
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
-	)
-
-	recorder := httptest.NewRecorder()
-
-	handler.UpdateCommunity(
-		recorder,
-		req,
-	)
-
-	if recorder.Code != http.StatusInternalServerError {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusInternalServerError,
-			recorder.Code,
-		)
 	}
 }

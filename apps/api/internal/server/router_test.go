@@ -488,3 +488,48 @@ func TestRouterLogsNormalizedCommunityRoute(t *testing.T) {
 		)
 	}
 }
+
+func TestRouterCreateCommunityReachesHandler(t *testing.T) {
+	t.Parallel()
+
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/communities",
+		strings.NewReader(`{
+			"name": "Toronto Men",
+			"slug": "toronto-men",
+			"description": "Toronto community",
+			"external_source": "test"
+		}`),
+	)
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	// The test router's service mock accepts the request,
+	// so reaching the handler should result in a successful
+	// community creation response.
+	if rec.Code != http.StatusCreated {
+		t.Fatalf(
+			"expected POST /api/v1/communities to return %d, got %d: %s",
+			http.StatusCreated,
+			rec.Code,
+			rec.Body.String(),
+		)
+	}
+
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf(
+			"expected Content-Type application/json, got %q",
+			got,
+		)
+	}
+}
