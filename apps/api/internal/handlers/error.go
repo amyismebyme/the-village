@@ -38,10 +38,7 @@ func writeError(
 	)
 }
 
-func writeServiceError(
-	w http.ResponseWriter,
-	err error,
-) {
+func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidCommunityID):
 		writeError(

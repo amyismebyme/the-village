@@ -17,7 +17,7 @@ type createCommunityRequest struct {
 
 // CreateCommunity handles:
 //
-//	POST /communities
+//	POST /api/v1/communities
 func (h *Handler) CreateCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -66,7 +66,7 @@ func (h *Handler) CreateCommunity(
 	httputil.WriteJSON(
 		w,
 		http.StatusCreated,
-		community,
+		newCommunityResponse(community),
 	)
 }
 
@@ -78,10 +78,7 @@ func (h *Handler) ListCommunities(
 	r *http.Request,
 ) {
 	if r.Method != http.MethodGet {
-		w.Header().Set(
-			"Allow",
-			http.MethodGet,
-		)
+		w.Header().Set("Allow", http.MethodGet)
 
 		writeError(
 			w,
@@ -96,31 +93,19 @@ func (h *Handler) ListCommunities(
 	communities, err := h.communityService.List(
 		r.Context(),
 	)
-
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	// Maintain a stable JSON contract:
-	//
-	// {
-	//     "communities": []
-	// }
-	//
-	// rather than:
-	//
-	// {
-	//     "communities": null
-	// }
 	if communities == nil {
 		communities = []*model.Community{}
 	}
 
 	response := struct {
-		Communities []*model.Community `json:"communities"`
+		Communities []communityResponse `json:"communities"`
 	}{
-		Communities: communities,
+		Communities: newCommunityResponses(communities),
 	}
 
 	httputil.WriteJSON(
@@ -150,9 +135,11 @@ func (h *Handler) GetCommunity(
 		return
 	}
 
-	idString := r.PathValue("id")
-
-	id, err := strconv.ParseInt(idString, 10, 64)
+	id, err := strconv.ParseInt(
+		r.PathValue("id"),
+		10,
+		64,
+	)
 	if err != nil || id <= 0 {
 		writeError(
 			w,
@@ -187,7 +174,7 @@ func (h *Handler) GetCommunity(
 	httputil.WriteJSON(
 		w,
 		http.StatusOK,
-		community,
+		newCommunityResponse(community),
 	)
 }
 
@@ -211,9 +198,11 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	idString := r.PathValue("id")
-
-	id, err := strconv.ParseInt(idString, 10, 64)
+	id, err := strconv.ParseInt(
+		r.PathValue("id"),
+		10,
+		64,
+	)
 	if err != nil || id <= 0 {
 		writeError(
 			w,
@@ -225,15 +214,12 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	var community model.Community
+	var request createCommunityRequest
 
-	// Decode exactly once.
-	// decodeJSON should reject unknown fields and
-	// multiple JSON values.
 	if err := decodeJSON(
 		w,
 		r,
-		&community,
+		&request,
 	); err != nil {
 		writeError(
 			w,
@@ -245,19 +231,23 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	// The URL is authoritative for the resource ID.
-	community.ID = id
+	community := &model.Community{
+		ID:             id,
+		Name:           request.Name,
+		Slug:           request.Slug,
+		Description:    request.Description,
+		ExternalSource: request.ExternalSource,
+	}
 
 	if err := h.communityService.Update(
 		r.Context(),
-		&community,
+		community,
 	); err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	// Return the canonical representation after the update.
-	updated, err := h.communityService.Get(
+	updatedCommunity, err := h.communityService.Get(
 		r.Context(),
 		id,
 	)
@@ -266,22 +256,12 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
-	if updated == nil {
-		writeError(
-			w,
-			http.StatusNotFound,
-			"community_not_found",
-			"community not found",
-		)
-
-		return
-	}
-
 	httputil.WriteJSON(
 		w,
 		http.StatusOK,
-		updated,
+		newCommunityResponse(updatedCommunity),
 	)
+
 }
 
 // DeleteCommunity handles:
@@ -304,9 +284,11 @@ func (h *Handler) DeleteCommunity(
 		return
 	}
 
-	idString := r.PathValue("id")
-
-	id, err := strconv.ParseInt(idString, 10, 64)
+	id, err := strconv.ParseInt(
+		r.PathValue("id"),
+		10,
+		64,
+	)
 	if err != nil || id <= 0 {
 		writeError(
 			w,

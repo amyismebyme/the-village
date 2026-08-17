@@ -33,7 +33,7 @@ func (h *HealthHandler) ServeHTTP(
 ) {
 	switch r.URL.Path {
 	case "/health":
-		h.handleLiveness(w)
+		h.handleLiveness(w, r)
 
 	case "/ready":
 		h.handleReadiness(w, r)
@@ -45,6 +45,7 @@ func (h *HealthHandler) ServeHTTP(
 
 func (h *HealthHandler) handleLiveness(
 	w http.ResponseWriter,
+	r *http.Request,
 ) {
 	httputil.WriteJSON(
 		w,
@@ -73,19 +74,26 @@ func (h *HealthHandler) handleReadiness(
 
 	results := h.registry.Check(r.Context())
 
+	healthy := true
+
 	for _, result := range results {
 		if result.Error != "" {
-			httputil.WriteJSON(
-				w,
-				http.StatusServiceUnavailable,
-				HealthResponse{
-					Status: "unhealthy",
-					Checks: results,
-				},
-			)
-
-			return
+			healthy = false
+			break
 		}
+	}
+
+	if !healthy {
+		httputil.WriteJSON(
+			w,
+			http.StatusServiceUnavailable,
+			HealthResponse{
+				Status: "unhealthy",
+				Checks: results,
+			},
+		)
+
+		return
 	}
 
 	httputil.WriteJSON(

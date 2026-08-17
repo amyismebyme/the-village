@@ -21,35 +21,35 @@ import (
 type stubCommunityService struct{}
 
 func (stubCommunityService) Create(
-	ctx context.Context,
-	community *model.Community,
+	_ context.Context,
+	_ *model.Community,
 ) error {
 	return nil
 }
 
 func (stubCommunityService) Get(
-	ctx context.Context,
-	id int64,
+	_ context.Context,
+	_ int64,
 ) (*model.Community, error) {
 	return nil, nil
 }
 
 func (stubCommunityService) List(
-	ctx context.Context,
+	_ context.Context,
 ) ([]*model.Community, error) {
 	return nil, nil
 }
 
 func (stubCommunityService) Update(
-	ctx context.Context,
-	community *model.Community,
+	_ context.Context,
+	_ *model.Community,
 ) error {
 	return nil
 }
 
 func (stubCommunityService) Delete(
-	ctx context.Context,
-	id int64,
+	_ context.Context,
+	_ int64,
 ) error {
 	return nil
 }
@@ -58,67 +58,156 @@ func TestHealthEndpoint(t *testing.T) {
 	db := OpenTestDatabase(t)
 
 	registry := health.NewRegistry()
-	registry.Register(database.NewHealthChecker(db))
+	registry.Register(
+		database.NewHealthChecker(db),
+	)
 
 	appLogger := slog.New(
-		slog.NewTextHandler(io.Discard, nil),
+		slog.NewTextHandler(
+			io.Discard,
+			nil,
+		),
 	)
 
-	handler := handlers.NewHandler(stubCommunityService{})
+	handler := handlers.NewHandler(
+		stubCommunityService{},
+	)
 
 	testServer := httptest.NewServer(
-		server.NewRouter(appLogger, registry, handler),
+		server.NewRouter(
+			appLogger,
+			registry,
+			handler,
+		),
 	)
+
 	t.Cleanup(testServer.Close)
 
-	response, err := testServer.Client().Get(
-		testServer.URL + "/health",
-	)
-	if err != nil {
-		t.Fatalf("GET /health failed: %v", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusOK,
-			response.StatusCode,
+	t.Run("liveness", func(t *testing.T) {
+		response, err := testServer.Client().Get(
+			testServer.URL + "/health",
 		)
-	}
+		if err != nil {
+			t.Fatalf(
+				"GET /health failed: %v",
+				err,
+			)
+		}
 
-	if contentType := response.Header.Get("Content-Type"); contentType != "application/json" {
-		t.Fatalf(
-			"expected application/json, got %q",
-			contentType,
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf(
+				"expected /health status %d, got %d",
+				http.StatusOK,
+				response.StatusCode,
+			)
+		}
+
+		if contentType := response.Header.Get("Content-Type"); contentType != "application/json" {
+			t.Fatalf(
+				"expected application/json, got %q",
+				contentType,
+			)
+		}
+
+		var body health.HealthResponse
+
+		if err := json.NewDecoder(
+			response.Body,
+		).Decode(&body); err != nil {
+			t.Fatalf(
+				"decode /health response: %v",
+				err,
+			)
+		}
+
+		if body.Status != "healthy" {
+			t.Fatalf(
+				"expected /health status %q, got %q",
+				"healthy",
+				body.Status,
+			)
+		}
+
+		// Liveness must not expose dependency checks.
+		if len(body.Checks) != 0 {
+			t.Fatalf(
+				"expected /health to contain no dependency checks, got %+v",
+				body.Checks,
+			)
+		}
+	})
+
+	t.Run("readiness", func(t *testing.T) {
+		response, err := testServer.Client().Get(
+			testServer.URL + "/ready",
 		)
-	}
+		if err != nil {
+			t.Fatalf(
+				"GET /ready failed: %v",
+				err,
+			)
+		}
 
-	var body handlers.HealthResponse
+		defer response.Body.Close()
 
-	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
-		t.Fatalf(
-			"decode health response: %v",
-			err,
-		)
-	}
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf(
+				"expected /ready status %d, got %d",
+				http.StatusOK,
+				response.StatusCode,
+			)
+		}
 
-	if body.Status != "healthy" {
-		t.Fatalf(
-			"expected healthy, got %q",
-			body.Status,
-		)
-	}
+		if contentType := response.Header.Get("Content-Type"); contentType != "application/json" {
+			t.Fatalf(
+				"expected application/json, got %q",
+				contentType,
+			)
+		}
 
-	databaseStatus, exists := body.Checks[database.CheckerName]
-	if !exists {
-		t.Fatal("database health check missing")
-	}
+		var body health.HealthResponse
 
-	if databaseStatus != "healthy" {
-		t.Fatalf(
-			"expected database check to be healthy, got %q",
-			databaseStatus,
-		)
-	}
+		if err := json.NewDecoder(
+			response.Body,
+		).Decode(&body); err != nil {
+			t.Fatalf(
+				"decode /ready response: %v",
+				err,
+			)
+		}
+
+		if body.Status != "ready" {
+			t.Fatalf(
+				"expected /ready status %q, got %q",
+				"ready",
+				body.Status,
+			)
+		}
+
+		var databaseCheck *health.Result
+
+		for i := range body.Checks {
+			if body.Checks[i].Name == database.CheckerName {
+				databaseCheck = &body.Checks[i]
+				break
+			}
+		}
+
+		if databaseCheck == nil {
+			t.Fatalf(
+				"database readiness check missing; expected %q, got %+v",
+				database.CheckerName,
+				body.Checks,
+			)
+		}
+
+		if databaseCheck.Error != "" {
+			t.Fatalf(
+				"expected database readiness check to be healthy, got error %q",
+				databaseCheck.Error,
+			)
+		}
+	})
 }

@@ -14,21 +14,23 @@ func registerSystemRoutes(
 	appLogger *slog.Logger,
 	healthRegistry *health.Registry,
 ) {
-	healthHandler := handlers.NewHealthHandler(
+	healthHandler := health.NewHealthHandler(
 		appLogger,
 		healthRegistry,
 	)
 
+	// Liveness and readiness are owned by the health package.
 	mux.Handle(
 		"GET /health",
 		healthHandler,
 	)
 
-	mux.HandleFunc(
+	mux.Handle(
 		"GET /ready",
-		handlers.ReadyHandler,
+		healthHandler,
 	)
 
+	// Build/runtime information remains in handlers.
 	mux.HandleFunc(
 		"GET /version",
 		handlers.VersionHandler,

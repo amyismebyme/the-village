@@ -6,19 +6,13 @@ import (
 )
 
 type Community struct {
-	ID int64 `json:"id"`
-
-	Name string `json:"name"`
-
-	Slug string `json:"slug"`
-
-	Description string `json:"description,omitempty"`
-
-	ExternalSource string `json:"external_source,omitempty"`
-
-	CreatedAt time.Time `json:"created_at"`
-
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             int64
+	Name           string
+	Slug           string
+	Description    string
+	ExternalSource string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func (c *Community) Normalize() {
