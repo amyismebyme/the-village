@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
@@ -25,6 +27,9 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 )
 
 const (
@@ -210,68 +215,16 @@ type integrationApp struct {
 
 // newIntegrationApp creates a complete application backed by the real
 // PostgreSQL database.
+
 func newIntegrationApp(t *testing.T) *integrationApp {
 	t.Helper()
 
-	loadIntegrationEnv()
-
-	db := OpenTestDatabase(t)
-
-	repo := postgres.NewCommunityRepository(
-		db.Pool(),
-	)
-
-	ctx := context.Background()
-
-	// Each integration test starts with a clean community table.
-	if err := repo.DeleteAll(ctx); err != nil {
-		t.Fatalf(
-			"clean communities before test: %v",
-			err,
-		)
-	}
-
-	// Also clean up after the test.
-	t.Cleanup(func() {
-		if err := repo.DeleteAll(context.Background()); err != nil {
-			t.Logf(
-				"clean communities after test: %v",
-				err,
-			)
-		}
-	})
-
-	communityService := service.NewCommunityService(repo)
-
-	handler := handlers.NewHandler(
-		communityService,
-	)
-
 	cfg := config.Load()
 
-	appLogger := logger.New(cfg)
-
-	healthRegistry := health.NewRegistry()
-
-	httpHandler := server.NewRouter(
-		appLogger,
-		healthRegistry,
-		handler,
+	return newIntegrationAppWithLogger(
+		t,
+		logger.New(cfg),
 	)
-
-	testServer := httptest.NewServer(
-		httpHandler,
-	)
-
-	t.Cleanup(func() {
-		testServer.Close()
-	})
-
-	return &integrationApp{
-		server: testServer,
-		db:     db,
-		repo:   repo,
-	}
 }
 
 // -----------------------------------------------------------------------------
@@ -402,4 +355,68 @@ func communityPath(id int64) string {
 // Backward-compatible name for existing tests.
 func communityIDPath(id int64) string {
 	return communityPath(id)
+}
+
+func newIntegrationAppWithLogger(
+	t *testing.T,
+	appLogger *slog.Logger,
+) *integrationApp {
+	t.Helper()
+
+	loadIntegrationEnv()
+
+	db := OpenTestDatabase(t)
+
+	metrics.Register(
+		prometheus.DefaultRegisterer,
+		db.Pool(),
+	)
+
+	repo := postgres.NewCommunityRepository(
+		db.Pool(),
+	)
+
+	ctx := context.Background()
+
+	if err := repo.DeleteAll(ctx); err != nil {
+		t.Fatalf(
+			"clean communities before test: %v",
+			err,
+		)
+	}
+
+	t.Cleanup(func() {
+		if err := repo.DeleteAll(context.Background()); err != nil {
+			t.Logf(
+				"clean communities after test: %v",
+				err,
+			)
+		}
+	})
+
+	communityService := service.NewCommunityService(repo)
+
+	handler := handlers.NewHandler(
+		communityService,
+	)
+
+	healthRegistry := health.NewRegistry()
+
+	httpHandler := server.NewRouter(
+		appLogger,
+		healthRegistry,
+		handler,
+	)
+
+	testServer := httptest.NewServer(httpHandler)
+
+	t.Cleanup(func() {
+		testServer.Close()
+	})
+
+	return &integrationApp{
+		server: testServer,
+		db:     db,
+		repo:   repo,
+	}
 }

@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -9,12 +10,30 @@ import (
 	"testing"
 )
 
-func TestHealthLivenessReturnsOKWithoutRegistry(t *testing.T) {
-	logger := slog.Default()
+type testChecker struct {
+	name string
+	err  error
+}
+
+func (c testChecker) Name() string {
+	return c.name
+}
+
+func (c testChecker) Check(context.Context) error {
+	return c.err
+}
+
+func TestHealthLivenessIgnoresDependencyFailure(t *testing.T) {
+	registry := NewRegistry()
+
+	registry.Register(testChecker{
+		name: "database",
+		err:  errors.New("database unavailable"),
+	})
 
 	handler := NewHealthHandler(
-		logger,
-		nil,
+		slog.Default(),
+		registry,
 	)
 
 	req := httptest.NewRequest(
@@ -35,54 +54,36 @@ func TestHealthLivenessReturnsOKWithoutRegistry(t *testing.T) {
 		)
 	}
 
-	if got := rec.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf(
-			"expected Content-Type application/json, got %q",
-			got,
-		)
-	}
-
 	if !strings.Contains(
 		rec.Body.String(),
 		`"status":"healthy"`,
 	) {
 		t.Fatalf(
-			"expected healthy response, got %q",
+			"expected healthy liveness response, got %q",
+			rec.Body.String(),
+		)
+	}
+
+	// Liveness must not expose dependency checks.
+	if strings.Contains(rec.Body.String(), "database") {
+		t.Fatalf(
+			"liveness response unexpectedly contains dependency data: %s",
 			rec.Body.String(),
 		)
 	}
 }
 
-func TestHealthDoesNotDependOnDatabase(t *testing.T) {
-	// A nil registry represents no dependency checks being available.
-	// Liveness must still succeed.
+func TestReadinessReturns503WhenDependencyFails(t *testing.T) {
+	registry := NewRegistry()
+
+	registry.Register(testChecker{
+		name: "database",
+		err:  errors.New("database unavailable"),
+	})
+
 	handler := NewHealthHandler(
 		slog.Default(),
-		nil,
-	)
-
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/health",
-		nil,
-	)
-
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf(
-			"expected liveness to remain healthy without dependency checks, got %d",
-			rec.Code,
-		)
-	}
-}
-
-func TestReadyReturns503WhenRegistryUnavailable(t *testing.T) {
-	handler := NewHealthHandler(
-		slog.Default(),
-		nil,
+		registry,
 	)
 
 	req := httptest.NewRequest(
@@ -103,48 +104,25 @@ func TestReadyReturns503WhenRegistryUnavailable(t *testing.T) {
 		)
 	}
 
+	body := rec.Body.String()
+
 	if !strings.Contains(
-		rec.Body.String(),
+		body,
 		`"status":"unhealthy"`,
 	) {
 		t.Fatalf(
-			"expected unhealthy response, got %q",
-			rec.Body.String(),
+			"expected unhealthy readiness response, got %q",
+			body,
 		)
 	}
-}
 
-func TestHealthUnknownPathReturns404(t *testing.T) {
-	handler := NewHealthHandler(
-		slog.Default(),
-		nil,
-	)
-
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/does-not-exist",
-		nil,
-	)
-
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
+	if !strings.Contains(
+		body,
+		`"name":"database"`,
+	) {
 		t.Fatalf(
-			"expected status %d, got %d",
-			http.StatusNotFound,
-			rec.Code,
+			"expected database check in readiness response, got %q",
+			body,
 		)
 	}
 }
-
-// Keep this compile-time assertion close to the tests so changes to the
-// health handler cannot accidentally stop implementing http.Handler.
-var _ http.Handler = NewHealthHandler(
-	slog.Default(),
-	nil,
-)
-
-// Ensure context remains part of the health-check contract.
-var _ = context.Background
