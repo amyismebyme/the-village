@@ -25,7 +25,7 @@ func registerRoutes(
 		healthRegistry,
 	)
 
-	registerCommunityRoutes(
+	registerAPIV1Routes(
 		mux,
 		handler,
 	)

@@ -153,3 +153,18 @@ For each new domain, use this sequence:
 9. API integration tests
 10. OpenAPI documentation
 11. UI client and screens
+
+
+
+## Router Verification
+
+Before completing a router change, verify the complete assembled router rather than only individual route registration functions.
+
+Run:
+
+```powershell
+go test ./internal/server/... -v
+go test ./...
+go test -race ./...
+go vet ./...
+golangci-lint run

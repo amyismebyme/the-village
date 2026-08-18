@@ -264,3 +264,102 @@ func newTestLogger(buf *bytes.Buffer) *slog.Logger {
 		),
 	)
 }
+
+func TestObservabilityParameterizedRouteNormalization(t *testing.T) {
+	var logs bytes.Buffer
+
+	app := newIntegrationAppWithLogger(
+		t,
+		newTestLogger(&logs),
+	)
+
+	route := "/api/v1/communities/{id}"
+
+	beforeRequests := testutil.ToFloat64(
+		metrics.RequestsTotal.WithLabelValues(
+			http.MethodGet,
+			route,
+			"404",
+		),
+	)
+
+	beforeDuration := histogramSampleCountForRoute(
+		t,
+		http.MethodGet,
+		route,
+	)
+
+	requestPath := "/api/v1/communities/999999"
+
+	response := integrationRequest(
+		t,
+		app,
+		http.MethodGet,
+		requestPath,
+		"",
+	)
+
+	io.Copy(io.Discard, response.Body)
+	response.Body.Close()
+
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusNotFound,
+			response.StatusCode,
+		)
+	}
+
+	afterRequests := testutil.ToFloat64(
+		metrics.RequestsTotal.WithLabelValues(
+			http.MethodGet,
+			route,
+			"404",
+		),
+	)
+
+	if got := afterRequests - beforeRequests; got != 1 {
+		t.Fatalf(
+			"expected parameterized route counter to increase by 1, got %v",
+			got,
+		)
+	}
+
+	afterDuration := histogramSampleCountForRoute(
+		t,
+		http.MethodGet,
+		route,
+	)
+
+	if afterDuration != beforeDuration+1 {
+		t.Fatalf(
+			"expected parameterized route duration sample to increase by 1; before=%d after=%d",
+			beforeDuration,
+			afterDuration,
+		)
+	}
+
+	logOutput := logs.String()
+
+	if !strings.Contains(
+		logOutput,
+		"route="+route,
+	) {
+		t.Fatalf(
+			"expected normalized route %q in logs, got:\n%s",
+			route,
+			logOutput,
+		)
+	}
+
+	if strings.Contains(
+		logOutput,
+		"route="+requestPath,
+	) {
+		t.Fatalf(
+			"expected concrete request path %q to be absent from route label, got:\n%s",
+			requestPath,
+			logOutput,
+		)
+	}
+}

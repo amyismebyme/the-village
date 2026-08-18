@@ -290,3 +290,62 @@ func histogramSampleCount(
 
 	return 0
 }
+
+func TestHTTPMetricsNormalizesServeMuxRoutePattern(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"GET /api/v1/communities/{id}",
+		func(
+			w http.ResponseWriter,
+			_ *http.Request,
+		) {
+			w.WriteHeader(http.StatusNotFound)
+		},
+	)
+
+	before := testutil.ToFloat64(
+		RequestsTotal.WithLabelValues(
+			http.MethodGet,
+			"/api/v1/communities/{id}",
+			"404",
+		),
+	)
+
+	handler := Middleware(mux)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/communities/123",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusNotFound,
+			rec.Code,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		RequestsTotal.WithLabelValues(
+			http.MethodGet,
+			"/api/v1/communities/{id}",
+			"404",
+		),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected normalized route counter to increase by 1, got %v",
+			got,
+		)
+	}
+}

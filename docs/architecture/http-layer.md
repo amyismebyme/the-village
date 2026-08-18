@@ -82,3 +82,20 @@ api.InternalServerError(w)
 ```
 
 This keeps responses consistent across every endpoint in the application.
+
+## Route Registration Architecture
+
+HTTP route registration is intentionally separated into three levels.
+
+### Application router
+
+`internal/server/router.go` constructs the `http.ServeMux` and applies the HTTP middleware stack.
+
+### Route composition
+
+`internal/server/routes.go` is the central composition point:
+
+```text
+registerRoutes()
+├── registerSystemRoutes()
+└── registerAPIV1Routes()
