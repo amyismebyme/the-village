@@ -1,76 +1,15 @@
 package server
 
 import (
-	"context"
+	"bytes"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
-	"github.com/amyismebyme/the-village/apps/api/internal/health"
-	"github.com/amyismebyme/the-village/apps/api/internal/model"
+	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
 )
-
-type routerContractCommunityService struct{}
-
-func (routerContractCommunityService) Create(
-	_ context.Context,
-	community *model.Community,
-) error {
-	community.ID = 1
-
-	return nil
-}
-
-func (routerContractCommunityService) Get(
-	_ context.Context,
-	_ int64,
-) (*model.Community, error) {
-	return nil, nil
-}
-
-func (routerContractCommunityService) List(
-	_ context.Context,
-) ([]*model.Community, error) {
-	return []*model.Community{}, nil
-}
-
-func (routerContractCommunityService) Update(
-	_ context.Context,
-	_ *model.Community,
-) error {
-	return nil
-}
-
-func (routerContractCommunityService) Delete(
-	_ context.Context,
-	_ int64,
-) error {
-	return nil
-}
-
-func newRouterContractHandler() http.Handler {
-	logger := slog.New(
-		slog.NewTextHandler(
-			httptest.NewRecorder(),
-			nil,
-		),
-	)
-
-	healthRegistry := health.NewRegistry()
-
-	handler := handlers.NewHandler(
-		routerContractCommunityService{},
-	)
-
-	return NewRouter(
-		logger,
-		healthRegistry,
-		handler,
-	)
-}
 
 func TestRouterContract(t *testing.T) {
 	t.Parallel()
@@ -153,7 +92,7 @@ func TestRouterContract(t *testing.T) {
 
 			rec := httptest.NewRecorder()
 
-			newRouterContractHandler().ServeHTTP(
+			newTestRouter().ServeHTTP(
 				rec,
 				req,
 			)
@@ -201,7 +140,7 @@ func TestRouterContractRejectsUnknownPaths(t *testing.T) {
 
 			rec := httptest.NewRecorder()
 
-			newRouterContractHandler().ServeHTTP(
+			newTestRouter().ServeHTTP(
 				rec,
 				req,
 			)
@@ -266,7 +205,7 @@ func TestRouterContractRejectsUnsupportedMethods(t *testing.T) {
 
 			rec := httptest.NewRecorder()
 
-			newRouterContractHandler().ServeHTTP(
+			newTestRouter().ServeHTTP(
 				rec,
 				req,
 			)
@@ -280,5 +219,147 @@ func TestRouterContractRejectsUnsupportedMethods(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestRouterLogsNormalizedCommunityRoute(t *testing.T) {
+	t.Parallel()
+
+	var logs bytes.Buffer
+
+	logger := slog.New(
+		slog.NewTextHandler(
+			&logs,
+			&slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			},
+		),
+	)
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"GET /api/v1/communities/{id}",
+		func(
+			w http.ResponseWriter,
+			_ *http.Request,
+		) {
+			w.WriteHeader(http.StatusOK)
+		},
+	)
+
+	handler := middleware.RequestID(
+		middleware.Logging(
+			logger,
+			mux,
+		),
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/communities/839274",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	output := logs.String()
+
+	if !strings.Contains(
+		output,
+		"route=/api/v1/communities/{id}",
+	) {
+		t.Fatalf(
+			"expected normalized community route; got:\n%s",
+			output,
+		)
+	}
+
+	if strings.Contains(
+		output,
+		"route=/api/v1/communities/839274",
+	) {
+		t.Fatalf(
+			"unexpected concrete route in log; got:\n%s",
+			output,
+		)
+	}
+
+	if !strings.Contains(
+		output,
+		"status=200",
+	) {
+		t.Fatalf(
+			"expected status=200; got:\n%s",
+			output,
+		)
+	}
+
+	if !strings.Contains(
+		output,
+		"request_id=",
+	) {
+		t.Fatalf(
+			"expected request_id; got:\n%s",
+			output,
+		)
+	}
+
+	if !strings.Contains(
+		output,
+		"duration_ms=",
+	) {
+		t.Fatalf(
+			"expected duration_ms; got:\n%s",
+			output,
+		)
+	}
+}
+
+func TestRouterCreateCommunityReachesHandler(t *testing.T) {
+	t.Parallel()
+
+	router := newTestRouter()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/communities",
+		strings.NewReader(`{
+			"name": "Toronto Men",
+			"slug": "toronto-men",
+			"description": "Toronto community",
+			"external_source": "test"
+		}`),
+	)
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf(
+			"expected POST /api/v1/communities to return %d, got %d: %s",
+			http.StatusCreated,
+			rec.Code,
+			rec.Body.String(),
+		)
+	}
+
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf(
+			"expected Content-Type application/json, got %q",
+			got,
+		)
+	}
+
+	if requestID := rec.Header().Get("X-Request-ID"); requestID == "" {
+		t.Fatal("expected X-Request-ID header")
 	}
 }
