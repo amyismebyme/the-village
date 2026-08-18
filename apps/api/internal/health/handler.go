@@ -74,7 +74,7 @@ func (h *HealthHandler) handleReadiness(
 
 	results := h.registry.Check(r.Context())
 
-	healthy := true
+	healthy := len(results) > 0
 
 	for _, result := range results {
 		if result.Error != "" {
