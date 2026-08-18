@@ -181,10 +181,6 @@ func (h *Handler) GetCommunity(
 // UpdateCommunity handles:
 //
 //	PUT /api/v1/communities/{id}
-//
-// UpdateCommunity handles:
-//
-//	PUT /api/v1/communities/{id}
 func (h *Handler) UpdateCommunity(
 	w http.ResponseWriter,
 	r *http.Request,

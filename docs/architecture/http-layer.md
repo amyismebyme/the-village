@@ -47,38 +47,7 @@ Handlers are **not** responsible for:
 
 ---
 
-## API Helpers
 
-All handlers use the shared `internal/api` package.
-
-### Success
-
-```go
-api.WriteJSON(w, http.StatusOK, community)
-```
-
-### Bad Request
-
-```go
-api.BadRequest(w, "validation failed")
-```
-
-### Not Found
-
-```go
-api.NotFound(w, "community not found")
-```
-
-### Conflict
-
-```go
-api.Conflict(w, "community already exists")
-```
-
-### Internal Server Error
-
-```go
-api.InternalServerError(w)
 ```
 
 This keeps responses consistent across every endpoint in the application.
