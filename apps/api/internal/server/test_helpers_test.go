@@ -78,7 +78,7 @@ func newTestRouter() http.Handler {
 
 // newTestRouterWithLogs builds a router that captures structured
 // log output into the supplied buffer.
-func newTestRouterWithLogs(logs *bytes.Buffer) http.Handler {
+/*func newTestRouterWithLogs(logs *bytes.Buffer) http.Handler {
 	logger := slog.New(
 		slog.NewTextHandler(
 			logs,
@@ -100,3 +100,4 @@ func newTestRouterWithLogs(logs *bytes.Buffer) http.Handler {
 		handler,
 	)
 }
+*/
