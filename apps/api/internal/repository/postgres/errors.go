@@ -1,50 +1,48 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
-
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func translateError(err error) error {
-
 	if err == nil {
 		return nil
 	}
 
-	//----------------------------------------
-	// No rows
-	//----------------------------------------
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return repository.ErrNotFound
+	// Preserve context semantics.
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
 	}
 
-	//----------------------------------------
-	// PostgreSQL errors
-	//----------------------------------------
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
 
+	// pgx represents PostgreSQL errors as *pgconn.PgError.
+	//
+	// Use errors.As rather than a direct type assertion because the
+	// database error may be wrapped by another layer.
 	var pgErr *pgconn.PgError
 
 	if errors.As(err, &pgErr) {
-
 		switch pgErr.Code {
-
-		// unique_violation
 		case "23505":
 			return repository.ErrAlreadyExists
 
-		// foreign_key_violation
 		case "23503":
 			return repository.ErrConflict
-
-		// check_violation
-		case "23514":
-			return repository.ErrInvalidInput
 		}
+	}
+
+	// pgx.ErrNoRows is the canonical "record not found" result for
+	// QueryRow(...).Scan(...).
+	if errors.Is(err, pgx.ErrNoRows) {
+		return repository.ErrNotFound
 	}
 
 	return err

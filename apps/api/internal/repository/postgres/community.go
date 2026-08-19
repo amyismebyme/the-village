@@ -2,10 +2,10 @@ package postgres
 
 import (
 	"context"
-	"time"
-
+	"errors"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,6 +32,9 @@ func (r *CommunityRepository) List(
 		observeQuery("list", start, err)
 	}()
 
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
+
 	const query = `
 SELECT
     id,
@@ -49,10 +52,19 @@ ORDER BY name;
 	if err != nil {
 		return nil, translateError(err)
 	}
+	defer rows.Close()
 
 	communities, err = scanCommunities(rows)
 	if err != nil {
 		return nil, translateError(err)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, translateError(err)
+	}
+
+	if communities == nil {
+		communities = []*model.Community{}
 	}
 
 	return communities, nil
@@ -68,7 +80,8 @@ func (r *CommunityRepository) FindByID(
 	defer func() {
 		observeQuery("find_by_id", start, err)
 	}()
-
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
 	const query = `
 SELECT
 	id,
@@ -97,12 +110,22 @@ func (r *CommunityRepository) Create(
 	ctx context.Context,
 	community *model.Community,
 ) (err error) {
-
 	start := time.Now()
 
 	defer func() {
 		observeQuery("create", start, err)
 	}()
+
+	if community == nil {
+		return errors.New("community is nil")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
 
 	const query = `
 INSERT INTO communities
@@ -151,22 +174,36 @@ func (r *CommunityRepository) Update(
 	ctx context.Context,
 	community *model.Community,
 ) (err error) {
-
 	start := time.Now()
 
 	defer func() {
 		observeQuery("update", start, err)
 	}()
 
+	if community == nil {
+		return errors.New("community is nil")
+	}
+
+	if community.ID <= 0 {
+		return errors.New("community ID must be greater than zero")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
+
 	const query = `
 UPDATE communities
 SET
-	name=$1,
-	slug=$2,
-	description=$3,
-	external_source=$4,
-	updated_at=NOW()
-WHERE id=$5
+	name = $1,
+	slug = $2,
+	description = $3,
+	external_source = $4,
+	updated_at = NOW()
+WHERE id = $5
 RETURNING updated_at;
 `
 
@@ -189,34 +226,6 @@ RETURNING updated_at;
 	return nil
 }
 
-func (r *CommunityRepository) Delete(
-	ctx context.Context,
-	id int64,
-) (err error) {
-
-	start := time.Now()
-
-	defer func() {
-		observeQuery("delete", start, err)
-	}()
-
-	const query = `
-DELETE FROM communities
-WHERE id=$1;
-`
-
-	result, err := r.Pool().Exec(ctx, query, id)
-	if err != nil {
-		return translateError(err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return repository.ErrNotFound
-	}
-
-	return nil
-}
-
 // DeleteAll removes every community and resets the identity sequence.
 //
 // This method is primarily intended for integration-test cleanup.
@@ -229,7 +238,8 @@ func (r *CommunityRepository) DeleteAll(
 	defer func() {
 		observeQuery("delete_all", start, err)
 	}()
-
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
 	const query = `
 TRUNCATE TABLE communities
 RESTART IDENTITY
@@ -253,7 +263,8 @@ func (r *CommunityRepository) FindBySlug(
 	defer func() {
 		observeQuery("find_by_slug", start, err)
 	}()
-
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
 	const query = `
 SELECT
 	id,
@@ -276,4 +287,46 @@ WHERE slug=$1;
 	}
 
 	return community, nil
+}
+
+func (r *CommunityRepository) Delete(
+	ctx context.Context,
+	id int64,
+) (err error) {
+	start := time.Now()
+
+	defer func() {
+		observeQuery("delete", start, err)
+	}()
+
+	if id <= 0 {
+		return errors.New("community ID must be greater than zero")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	ctx, cancel := r.withQueryTimeout(ctx)
+	defer cancel()
+
+	const query = `
+DELETE FROM communities
+WHERE id = $1;
+`
+
+	result, err := r.Pool().Exec(
+		ctx,
+		query,
+		id,
+	)
+	if err != nil {
+		return translateError(err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+
+	return nil
 }

@@ -5,13 +5,11 @@ import (
 	"testing"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
-
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestTranslateNoRows(t *testing.T) {
-
 	err := translateError(pgx.ErrNoRows)
 
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -20,7 +18,6 @@ func TestTranslateNoRows(t *testing.T) {
 }
 
 func TestTranslateDuplicateKey(t *testing.T) {
-
 	err := translateError(&pgconn.PgError{
 		Code: "23505",
 	})
@@ -31,7 +28,6 @@ func TestTranslateDuplicateKey(t *testing.T) {
 }
 
 func TestTranslateForeignKey(t *testing.T) {
-
 	err := translateError(&pgconn.PgError{
 		Code: "23503",
 	})
