@@ -1,0 +1,40 @@
+﻿# -------------------------------------------------------------------
+# Go (Golang) Rules
+# -------------------------------------------------------------------
+# Compiled binaries/executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+*.coverprofile
+coverage.txt
+
+# Dependency directories (Only uncomment if you vendoring dependencies)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# -------------------------------------------------------------------
+# Windows OS Rules
+# -------------------------------------------------------------------
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# -------------------------------------------------------------------
+# IDE / Environment Rules
+# -------------------------------------------------------------------
+.vscode/
+.idea/
+.env
+
+zscaler.crt

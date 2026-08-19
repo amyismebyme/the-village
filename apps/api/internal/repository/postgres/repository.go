@@ -2,17 +2,21 @@ package postgres
 
 import (
 	"context"
-
 	"github.com/jackc/pgx/v5/pgxpool"
+	"time"
 )
 
+const defaultQueryTimeout = 30 * time.Second
+
 type Repository struct {
-	pool *pgxpool.Pool
+	pool         *pgxpool.Pool
+	queryTimeout time.Duration
 }
 
 func New(pool *pgxpool.Pool) Repository {
 	return Repository{
-		pool: pool,
+		pool:         pool,
+		queryTimeout: defaultQueryTimeout,
 	}
 }
 
