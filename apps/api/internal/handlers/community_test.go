@@ -2054,3 +2054,101 @@ func TestDeleteCommunityMethodNotAllowed(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateCommunityValidationContract(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "missing name",
+			body: `{
+				"name": "",
+				"slug": "valid-community"
+			}`,
+		},
+		{
+			name: "invalid slug",
+			body: `{
+				"name": "Toronto Men",
+				"slug": "Invalid Slug"
+			}`,
+		},
+		{
+			name: "name too short",
+			body: `{
+				"name": "ab",
+				"slug": "valid-community"
+			}`,
+		},
+		{
+			name: "description too long",
+			body: `{
+				"name": "Toronto Men",
+				"slug": "valid-community",
+				"description": "` + strings.Repeat("x", 1001) + `"
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockService := &communityServiceMock{
+				createFunc: func(
+					_ context.Context,
+					_ *model.Community,
+				) error {
+					return service.ErrInvalidCommunity
+				},
+			}
+
+			handler := NewHandler(mockService)
+
+			req := newCommunityRequest(
+				http.MethodPost,
+				"/api/v1/communities",
+				tt.body,
+			)
+
+			recorder := httptest.NewRecorder()
+
+			handler.CreateCommunity(
+				recorder,
+				req,
+			)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusBadRequest,
+					recorder.Code,
+				)
+			}
+
+			if got := recorder.Header().Get("Content-Type"); got != "application/json" {
+				t.Fatalf(
+					"expected application/json, got %q",
+					got,
+				)
+			}
+
+			body := recorder.Body.String()
+
+			if !strings.Contains(
+				body,
+				`"code":"invalid_community"`,
+			) {
+				t.Fatalf(
+					"expected invalid_community error, got %s",
+					body,
+				)
+			}
+		})
+	}
+}
