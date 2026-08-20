@@ -51,9 +51,9 @@ func Load() Config {
 			MaxConnIdleTime:   getDuration("DB_MAX_CONN_IDLE_TIME", 300),
 			HealthCheckPeriod: getDuration("DB_HEALTH_CHECK_PERIOD", 60),
 			QueryTimeout: getDuration(
-            	"DB_QUERY_TIMEOUT",
-            	30,
-            ),
+				"DB_QUERY_TIMEOUT",
+				30,
+			),
 		},
 	}
 

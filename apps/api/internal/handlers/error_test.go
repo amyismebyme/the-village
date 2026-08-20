@@ -1,16 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-    "context"
-    "fmt"
+	"fmt"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
 	"github.com/amyismebyme/the-village/apps/api/internal/validation"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 )
 
 func TestWriteError(t *testing.T) {
@@ -138,7 +138,6 @@ func TestWriteCommunityServiceError(t *testing.T) {
 		})
 	}
 }
-
 
 func TestWriteCommunityServiceErrorTimeout(t *testing.T) {
 	recorder := httptest.NewRecorder()

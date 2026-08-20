@@ -85,8 +85,7 @@ func Run() error {
 
 	communityRepository := postgres.NewCommunityRepository(
 		db.Pool(),
-			cfg.Database.QueryTimeout,
-
+		cfg.Database.QueryTimeout,
 	)
 
 	communityService := service.NewCommunityService(

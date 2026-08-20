@@ -827,7 +827,3 @@ func TestCommunityAPI_DatabaseStateVerification(t *testing.T) {
 		)
 	}
 }
-
-
-
-

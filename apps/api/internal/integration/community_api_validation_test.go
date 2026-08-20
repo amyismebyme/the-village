@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-
 func TestCommunityAPI_ValidationFailures(t *testing.T) {
 	t.Run("missing required name", func(t *testing.T) {
 		app := newIntegrationApp(t)
@@ -282,8 +281,6 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 		}
 	})
 }
-
-
 
 func TestCommunityAPI_DuplicateSlug(t *testing.T) {
 	app := newIntegrationApp(t)

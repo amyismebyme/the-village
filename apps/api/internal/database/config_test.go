@@ -1,11 +1,9 @@
 package database
 
-
 import (
 	"testing"
 	"time"
 )
-
 
 func TestConfigQueryTimeout(t *testing.T) {
 	cfg := Config{
@@ -28,7 +26,6 @@ func TestConfigQueryTimeout(t *testing.T) {
 		)
 	}
 }
-
 
 func TestConfigRejectsInvalidQueryTimeout(t *testing.T) {
 	cfg := Config{
