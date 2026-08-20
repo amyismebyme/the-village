@@ -4,15 +4,15 @@ package integration
 
 import (
 	"bytes"
-	"io"
-	"log/slog"
-	"net/http"
-	"strings"
-	"testing"
-
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"testing"
 )
 
 func TestObservabilityEndToEnd(t *testing.T) {
@@ -361,5 +361,172 @@ func TestObservabilityParameterizedRouteNormalization(t *testing.T) {
 			requestPath,
 			logOutput,
 		)
+	}
+}
+
+func TestCommunityAPIObservabilityCorrelation(t *testing.T) {
+	var logs bytes.Buffer
+
+	app := newIntegrationAppWithLogger(
+		t,
+		newTestLogger(&logs),
+	)
+
+	route := "/api/v1/communities"
+
+	beforeRequests := testutil.ToFloat64(
+		metrics.RequestsTotal.WithLabelValues(
+			http.MethodPost,
+			route,
+			"201",
+		),
+	)
+
+	beforeDuration := histogramSampleCountForRoute(
+		t,
+		http.MethodPost,
+		route,
+	)
+
+	body := `{
+		"name": "Observability Community",
+		"slug": "observability-community-integration",
+		"description": "Observability integration test",
+		"external_source": "integration"
+	}`
+
+	resp := integrationRequest(
+		t,
+		app,
+		http.MethodPost,
+		route,
+		body,
+	)
+
+	requestID := requireRequestID(t, resp)
+
+	requireJSONResponse(
+		t,
+		resp,
+		http.StatusCreated,
+	)
+
+	created := decodeCommunity(t, resp)
+
+	if created.ID <= 0 {
+		t.Fatalf(
+			"expected created community ID > 0, got %d",
+			created.ID,
+		)
+	}
+
+	afterRequests := testutil.ToFloat64(
+		metrics.RequestsTotal.WithLabelValues(
+			http.MethodPost,
+			route,
+			"201",
+		),
+	)
+
+	if got := afterRequests - beforeRequests; got != 1 {
+		t.Fatalf(
+			"expected POST request counter to increase by 1, got %v",
+			got,
+		)
+	}
+
+	afterDuration := histogramSampleCountForRoute(
+		t,
+		http.MethodPost,
+		route,
+	)
+
+	if afterDuration != beforeDuration+1 {
+		t.Fatalf(
+			"expected POST duration sample to increase by 1; before=%d after=%d",
+			beforeDuration,
+			afterDuration,
+		)
+	}
+
+	logOutput := logs.String()
+
+	for _, expected := range []string{
+		"http request completed",
+		"request_id=" + requestID,
+		"method=POST",
+		"route=" + route,
+		"status=201",
+		"duration_ms=",
+	} {
+		if !strings.Contains(
+			logOutput,
+			expected,
+		) {
+			t.Fatalf(
+				"expected log to contain %q, got:\n%s",
+				expected,
+				logOutput,
+			)
+		}
+	}
+
+	if strings.Contains(
+		logOutput,
+		"route="+
+			"/api/v1/communities/"+strconv.FormatInt(created.ID, 10),
+	) {
+		t.Fatalf(
+			"expected normalized route instead of concrete community ID, got:\n%s",
+			logOutput,
+		)
+	}
+
+	metricsResponse, err := app.server.Client().Get(
+		app.server.URL + "/metrics",
+	)
+	if err != nil {
+		t.Fatalf(
+			"GET /metrics failed: %v",
+			err,
+		)
+	}
+
+	defer metricsResponse.Body.Close()
+
+	if metricsResponse.StatusCode != http.StatusOK {
+		t.Fatalf(
+			"expected /metrics status %d, got %d",
+			http.StatusOK,
+			metricsResponse.StatusCode,
+		)
+	}
+
+	metricsBody, err := io.ReadAll(
+		metricsResponse.Body,
+	)
+	if err != nil {
+		t.Fatalf(
+			"read /metrics response: %v",
+			err,
+		)
+	}
+
+	metricsText := string(metricsBody)
+
+	for _, metricName := range []string{
+		"village_http_requests_total",
+		"village_http_request_duration_seconds",
+		"village_http_requests_in_flight",
+	} {
+		if !strings.Contains(
+			metricsText,
+			metricName,
+		) {
+			t.Fatalf(
+				"expected /metrics to expose %s",
+				metricName,
+			)
+		}
 	}
 }

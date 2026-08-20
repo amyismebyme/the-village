@@ -420,3 +420,49 @@ func newIntegrationAppWithLogger(
 		repo:   repo,
 	}
 }
+
+func requireJSONResponse(
+	t *testing.T,
+	resp *http.Response,
+	expectedStatus int,
+) {
+	t.Helper()
+
+	if resp.StatusCode != expectedStatus {
+		defer resp.Body.Close()
+
+		t.Fatalf(
+			"expected HTTP status %d, got %d",
+			expectedStatus,
+			resp.StatusCode,
+		)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+
+	if contentType != "application/json" {
+		defer resp.Body.Close()
+
+		t.Fatalf(
+			"expected Content-Type application/json, got %q",
+			contentType,
+		)
+	}
+}
+
+func requireRequestID(
+	t *testing.T,
+	resp *http.Response,
+) string {
+	t.Helper()
+
+	requestID := resp.Header.Get("X-Request-ID")
+
+	if requestID == "" {
+		defer resp.Body.Close()
+
+		t.Fatal("expected X-Request-ID header")
+	}
+
+	return requestID
+}

@@ -22,6 +22,7 @@ type Config struct {
 	MaxConnIdleTime time.Duration
 
 	HealthCheckPeriod time.Duration
+	QueryTimeout      time.Duration
 }
 
 func (c Config) DSN() string {
@@ -77,6 +78,12 @@ func (c Config) Validate() error {
 
 	if c.HealthCheckPeriod <= 0 {
 		return fmt.Errorf("database health check period must be greater than zero")
+	}
+
+	if c.QueryTimeout <= 0 {
+		return fmt.Errorf(
+			"database query timeout must be greater than zero",
+		)
 	}
 
 	return nil

@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
+	"github.com/amyismebyme/the-village/apps/api/internal/validation"
 )
 
 type errorResponse struct {
@@ -38,8 +40,19 @@ func writeError(
 	)
 }
 
-func writeServiceError(w http.ResponseWriter, err error) {
+func writeServiceError(
+	w http.ResponseWriter,
+	err error,
+) {
 	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		writeError(
+			w,
+			http.StatusGatewayTimeout,
+			"request_timeout",
+			"request timed out while processing the request",
+		)
+
 	case errors.Is(err, service.ErrInvalidCommunityID):
 		writeError(
 			w,
@@ -53,7 +66,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 			w,
 			http.StatusBadRequest,
 			"invalid_community",
-			"invalid community",
+			validationMessage(err),
 		)
 
 	case errors.Is(err, service.ErrCommunityAlreadyExists):
@@ -80,4 +93,26 @@ func writeServiceError(w http.ResponseWriter, err error) {
 			"internal server error",
 		)
 	}
+}
+
+func validationMessage(err error) string {
+	var multi interface {
+		Unwrap() []error
+	}
+
+	if !errors.As(err, &multi) {
+		return "invalid community"
+	}
+
+	for _, cause := range multi.Unwrap() {
+		switch {
+		case errors.Is(cause, validation.ErrRequired),
+			errors.Is(cause, validation.ErrTooShort),
+			errors.Is(cause, validation.ErrTooLong),
+			errors.Is(cause, validation.ErrInvalidSlug):
+			return cause.Error()
+		}
+	}
+
+	return "invalid community"
 }
