@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	"errors"
-	"testing"
-
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
+	"github.com/amyismebyme/the-village/apps/api/internal/validation"
+	"testing"
 )
 
 type mockCommunityRepository struct {
@@ -293,5 +293,111 @@ func TestDeleteCommunity(t *testing.T) {
 
 	if !errors.Is(err, repository.ErrNotFound) {
 		t.Fatal("community should have been deleted")
+	}
+}
+
+func TestCommunityServiceCreateInvalidCommunityDoesNotReachRepository(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	repo := newMockCommunityRepository()
+
+	community := &model.Community{
+		Name: "",
+		Slug: "",
+	}
+
+	err := NewCommunityService(repo).Create(
+		context.Background(),
+		community,
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidCommunity,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	if len(repo.communities) != 0 {
+		t.Fatalf(
+			"expected repository to remain empty, got %d records",
+			len(repo.communities),
+		)
+	}
+}
+
+func TestCommunityServiceUpdateInvalidCommunityDoesNotReachRepository(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	repo := newMockCommunityRepository()
+
+	community := &model.Community{
+		ID:   1,
+		Name: "",
+		Slug: "",
+	}
+
+	err := NewCommunityService(repo).Update(
+		context.Background(),
+		community,
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidCommunity,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+}
+
+func TestCommunityServiceCreatePreservesSlugValidationCause(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	repo := newMockCommunityRepository()
+
+	service := NewCommunityService(repo)
+
+	err := service.Create(
+		context.Background(),
+		&model.Community{
+			Name: "Valid Community",
+			Slug: "Invalid Slug",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+
+	if !errors.Is(
+		err,
+		ErrInvalidCommunity,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	if !errors.Is(
+		err,
+		validation.ErrInvalidSlug,
+	) {
+		t.Fatalf(
+			"expected validation.ErrInvalidSlug to be preserved, got %v",
+			err,
+		)
 	}
 }

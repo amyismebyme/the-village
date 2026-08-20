@@ -4,14 +4,24 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
-var slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+var slugPattern = regexp.MustCompile(
+	`^[a-z0-9]+(?:-[a-z0-9]+)*$`,
+)
+
+var (
+	ErrRequired      = errors.New("value is required")
+	ErrTooShort      = errors.New("value is too short")
+	ErrTooLong       = errors.New("value is too long")
+	ErrInvalidSlug   = errors.New("invalid slug")
+	ErrInvalidLength = errors.New("invalid length bounds")
+)
 
 func Required(value string) error {
-
 	if strings.TrimSpace(value) == "" {
-		return errors.New("value is required")
+		return ErrRequired
 	}
 
 	return nil
@@ -22,15 +32,20 @@ func Length(
 	min int,
 	max int,
 ) error {
+	if min < 0 || max < min {
+		return ErrInvalidLength
+	}
 
-	length := len(strings.TrimSpace(value))
+	value = strings.TrimSpace(value)
+
+	length := utf8.RuneCountInString(value)
 
 	if length < min {
-		return errors.New("value is too short")
+		return ErrTooShort
 	}
 
 	if length > max {
-		return errors.New("value is too long")
+		return ErrTooLong
 	}
 
 	return nil
@@ -40,24 +55,32 @@ func MaxLength(
 	value string,
 	max int,
 ) error {
+	if max < 0 {
+		return ErrInvalidLength
+	}
 
-	length := len(strings.TrimSpace(value))
+	value = strings.TrimSpace(value)
+
+	length := utf8.RuneCountInString(value)
 
 	if length > max {
-		return errors.New("value is too long")
+		return ErrTooLong
 	}
 
 	return nil
 }
 
 func Slug(value string) error {
+	if value == "" {
+		return ErrInvalidSlug
+	}
 
 	if value != strings.ToLower(value) {
-		return errors.New("slug must be lowercase")
+		return ErrInvalidSlug
 	}
 
 	if !slugPattern.MatchString(value) {
-		return errors.New("invalid slug")
+		return ErrInvalidSlug
 	}
 
 	return nil

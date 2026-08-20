@@ -1,3 +1,4 @@
+#integration-environment lifecycle — Docker PostgreSQL, migrations, integration tests, cleanup.
 param(
     [switch]$KeepRunning
 )

@@ -62,7 +62,7 @@ func (s *communityService) Create(
 	community.Normalize()
 
 	if err := validateCommunity(community); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidCommunity, err)
+		return err
 	}
 
 	existing, err := s.slugExists(ctx, community.Slug)
@@ -153,7 +153,7 @@ func (s *communityService) Update(
 	community.Normalize()
 
 	if err := validateCommunity(community); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidCommunity, err)
+		return err
 	}
 
 	current, err := s.repository.FindByID(ctx, community.ID)
@@ -226,9 +226,19 @@ func (s *communityService) Delete(
 func validateCommunity(
 	c *model.Community,
 ) error {
+	if c == nil {
+		return fmt.Errorf(
+			"%w: community is nil",
+			ErrInvalidCommunity,
+		)
+	}
 
 	if err := c.Validate(); err != nil {
-		return ErrInvalidCommunity
+		return fmt.Errorf(
+			"%w: %w",
+			ErrInvalidCommunity,
+			err,
+		)
 	}
 
 	return nil
