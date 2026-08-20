@@ -2,8 +2,9 @@ package postgres
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const defaultQueryTimeout = 30 * time.Second
@@ -13,10 +14,20 @@ type Repository struct {
 	queryTimeout time.Duration
 }
 
-func New(pool *pgxpool.Pool) Repository {
+func New(
+	pool *pgxpool.Pool,
+	queryTimeout ...time.Duration,
+) Repository {
+	timeout := defaultQueryTimeout
+
+	if len(queryTimeout) > 0 &&
+		queryTimeout[0] > 0 {
+		timeout = queryTimeout[0]
+	}
+
 	return Repository{
 		pool:         pool,
-		queryTimeout: defaultQueryTimeout,
+		queryTimeout: timeout,
 	}
 }
 
@@ -24,6 +35,8 @@ func (r Repository) Pool() *pgxpool.Pool {
 	return r.pool
 }
 
-func (r Repository) Ping(ctx context.Context) error {
+func (r Repository) Ping(
+	ctx context.Context,
+) error {
 	return r.pool.Ping(ctx)
 }

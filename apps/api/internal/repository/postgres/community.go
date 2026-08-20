@@ -16,9 +16,15 @@ type CommunityRepository struct {
 	Repository
 }
 
-func NewCommunityRepository(pool *pgxpool.Pool) *CommunityRepository {
+func NewCommunityRepository(
+	pool *pgxpool.Pool,
+	queryTimeout ...time.Duration,
+) *CommunityRepository {
 	return &CommunityRepository{
-		Repository: New(pool),
+		Repository: New(
+			pool,
+			queryTimeout...,
+		),
 	}
 }
 

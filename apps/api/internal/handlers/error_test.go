@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
+    "context"
+    "fmt"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
+	"github.com/amyismebyme/the-village/apps/api/internal/validation"
 )
 
 func TestWriteError(t *testing.T) {
@@ -134,5 +136,104 @@ func TestWriteCommunityServiceError(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+
+func TestWriteCommunityServiceErrorTimeout(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	err := fmt.Errorf(
+		"community service: database operation: %w",
+		context.DeadlineExceeded,
+	)
+
+	writeServiceError(
+		recorder,
+		err,
+	)
+
+	if recorder.Code != http.StatusGatewayTimeout {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusGatewayTimeout,
+			recorder.Code,
+		)
+	}
+
+	var response errorResponse
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode response: %v",
+			err,
+		)
+	}
+
+	if response.Error.Code != "request_timeout" {
+		t.Fatalf(
+			"expected code %q, got %q",
+			"request_timeout",
+			response.Error.Code,
+		)
+	}
+}
+
+func TestWriteCommunityServiceErrorPreservesValidationDetail(
+	t *testing.T,
+) {
+	recorder := httptest.NewRecorder()
+
+	validationErr := fmt.Errorf(
+		"name: %w",
+		validation.ErrTooShort,
+	)
+
+	err := fmt.Errorf(
+		"%w: %w",
+		service.ErrInvalidCommunity,
+		validationErr,
+	)
+
+	writeServiceError(
+		recorder,
+		err,
+	)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
+		)
+	}
+
+	var response errorResponse
+
+	if err := json.NewDecoder(
+		recorder.Body,
+	).Decode(&response); err != nil {
+		t.Fatalf(
+			"decode response: %v",
+			err,
+		)
+	}
+
+	if response.Error.Code != "invalid_community" {
+		t.Fatalf(
+			"expected code %q, got %q",
+			"invalid_community",
+			response.Error.Code,
+		)
+	}
+
+	if response.Error.Message != "name: value is too short" {
+		t.Fatalf(
+			"expected validation detail %q, got %q",
+			"name: value is too short",
+			response.Error.Message,
+		)
 	}
 }
