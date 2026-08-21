@@ -61,7 +61,6 @@ func loadOpenAPI(t *testing.T) document {
 	}
 }
 
-
 func TestOpenAPIFoundation(t *testing.T) {
 	spec := loadOpenAPI(t)
 
