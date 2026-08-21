@@ -1,0 +1,632 @@
+openapi: 3.1.0
+
+info:
+  title: The Village API
+  description: HTTP API for The Village community platform.
+  version: 0.1.2
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: System
+    description: Health and application runtime endpoints.
+  - name: Communities
+    description: Community CRUD operations.
+  - name: Observability
+    description: Prometheus metrics.
+
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: Liveness check
+      description: Reports whether the API process is alive and able to serve requests. This endpoint does not depend on PostgreSQL readiness.
+      operationId: getHealth
+      responses:
+        '200':
+          description: API process is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+
+  /ready:
+    get:
+      tags:
+        - System
+      summary: Readiness check
+      description: Reports whether the API is ready to receive traffic. Dependency checks, including the database health check, are evaluated here.
+      operationId: getReady
+      responses:
+        '200':
+          description: API and required dependencies are ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ready
+                checks:
+                  - name: database
+
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /version:
+    get:
+      tags:
+        - System
+      summary: Get build version information
+      description: Returns application version and build metadata.
+      operationId: getVersion
+      responses:
+        '200':
+          description: Current application build information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+              example:
+                version: 0.1.2
+                git_commit: local
+                build_date: '2026-08-20T00:00:00Z'
+
+  /status:
+    get:
+      tags:
+        - System
+      summary: Get runtime status
+      description: Returns runtime, build, and uptime information for the running API process.
+      operationId: getStatus
+      responses:
+        '200':
+          description: Current runtime status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                status: running
+                version: 0.1.2
+                build_date: '2026-08-20T00:00:00Z'
+                go_version: go1.26.5
+                uptime: 1h23m45s
+                started_at: '2026-08-20T00:00:00Z'
+                git_commit: local
+
+  /metrics:
+    get:
+      tags:
+        - Observability
+      summary: Prometheus metrics
+      description: Exposes application and database metrics in Prometheus exposition format.
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Prometheus metrics payload.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/v1/communities:
+    get:
+      tags:
+        - Communities
+      summary: List communities
+      description: Returns all communities ordered according to the repository list contract.
+      operationId: listCommunities
+      responses:
+        '200':
+          description: Community collection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityListResponse'
+              examples:
+                populated:
+                  summary: Communities returned
+                  value:
+                    communities:
+                      - id: 1
+                        name: Toronto Men
+                        slug: toronto-men
+                        description: A community for men in Toronto.
+                        external_source: manual
+                        created_at: '2026-08-20T18:00:00Z'
+                        updated_at: '2026-08-20T18:00:00Z'
+
+                empty:
+                  summary: Empty community collection
+                  value:
+                    communities: []
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Communities
+      summary: Create a community
+      description: Creates a community after normalization and domain validation.
+      operationId: createCommunity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityCreateRequest'
+            example:
+              name: '  Toronto Men  '
+              slug: '  Toronto-Men  '
+              description: '  A community for men in Toronto.  '
+              external_source: '  manual  '
+      responses:
+        '201':
+          description: Community created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Community'
+              example:
+                id: 1
+                name: Toronto Men
+                slug: toronto-men
+                description: A community for men in Toronto.
+                external_source: manual
+                created_at: '2026-08-20T18:00:00Z'
+                updated_at: '2026-08-20T18:00:00Z'
+
+        '400':
+          $ref: '#/components/responses/InvalidCommunity'
+
+        '409':
+          $ref: '#/components/responses/CommunityAlreadyExists'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/communities/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CommunityID'
+
+    get:
+      tags:
+        - Communities
+      summary: Get a community
+      description: Returns a single community by numeric ID.
+      operationId: getCommunity
+      responses:
+        '200':
+          description: Community returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Community'
+              example:
+                id: 1
+                name: Toronto Men
+                slug: toronto-men
+                description: A community for men in Toronto.
+                external_source: manual
+                created_at: '2026-08-20T18:00:00Z'
+                updated_at: '2026-08-20T18:00:00Z'
+
+        '400':
+          $ref: '#/components/responses/InvalidID'
+
+        '404':
+          $ref: '#/components/responses/CommunityNotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Communities
+      summary: Update a community
+      description: Updates a community by ID after normalization and domain validation.
+      operationId: updateCommunity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityUpdateRequest'
+            example:
+              name: Toronto Men Updated
+              slug: toronto-men-updated
+              description: Updated Toronto community description.
+              external_source: manual-updated
+      responses:
+        '200':
+          description: Community updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Community'
+              example:
+                id: 1
+                name: Toronto Men Updated
+                slug: toronto-men-updated
+                description: Updated Toronto community description.
+                external_source: manual-updated
+                created_at: '2026-08-20T18:00:00Z'
+                updated_at: '2026-08-20T18:10:00Z'
+
+        '400':
+          $ref: '#/components/responses/InvalidCommunity'
+
+        '400':
+          $ref: '#/components/responses/InvalidID'
+
+        '404':
+          $ref: '#/components/responses/CommunityNotFound'
+
+        '409':
+          $ref: '#/components/responses/CommunityAlreadyExists'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Communities
+      summary: Delete a community
+      description: Deletes a community by ID.
+      operationId: deleteCommunity
+      responses:
+        '204':
+          description: Community deleted successfully. No response body is returned.
+
+        '400':
+          $ref: '#/components/responses/InvalidID'
+
+        '404':
+          $ref: '#/components/responses/CommunityNotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    CommunityID:
+      name: id
+      in: path
+      required: true
+      description: Numeric community identifier.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+
+  responses:
+    InvalidCommunity:
+      description: The community request is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: invalid_community
+              message: Community request is invalid.
+
+    InvalidID:
+      description: The community ID is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: invalid_id
+              message: Community ID must be a positive integer.
+
+    CommunityNotFound:
+      description: The requested community does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: community_not_found
+              message: Community not found.
+
+    CommunityAlreadyExists:
+      description: A community with the same unique identifier already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: community_already_exists
+              message: Community already exists.
+
+    InternalServerError:
+      description: An unexpected internal server error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: internal_server_error
+              message: Internal server error.
+
+    GatewayTimeout:
+      description: A required upstream service timed out.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: gateway_timeout
+              message: Upstream service timed out.
+
+    ServiceUnavailable:
+      description: A required service is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: service_unavailable
+              message: Service unavailable.
+
+  schemas:
+    Community:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Database-generated community identifier.
+          example: 1
+
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Community display name.
+          example: Toronto Men
+
+        slug:
+          type: string
+          minLength: 1
+          description: Lowercase URL-friendly community slug.
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          example: toronto-men
+
+        description:
+          type: string
+          maxLength: 2000
+          description: Optional community description.
+          example: A community for men in Toronto.
+
+        external_source:
+          type: string
+          description: Optional source identifier associated with the community.
+          example: manual
+
+        created_at:
+          type: string
+          format: date-time
+          description: Time the community was created.
+
+        updated_at:
+          type: string
+          format: date-time
+          description: Time the community was last updated.
+
+    CommunityCreateRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Community display name.
+          example: Toronto Men
+
+        slug:
+          type: string
+          minLength: 1
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          description: Lowercase URL-friendly community slug. Input is normalized before validation.
+          example: toronto-men
+
+        description:
+          type: string
+          maxLength: 2000
+          description: Optional community description.
+          example: A community for men in Toronto.
+
+        external_source:
+          type: string
+          description: Optional source identifier.
+          example: manual
+
+    CommunityUpdateRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Updated community display name.
+          example: Toronto Men Updated
+
+        slug:
+          type: string
+          minLength: 1
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          description: Updated lowercase URL-friendly community slug.
+          example: toronto-men-updated
+
+        description:
+          type: string
+          maxLength: 2000
+          description: Updated community description.
+          example: Updated Toronto community description.
+
+        external_source:
+          type: string
+          description: Updated source identifier.
+          example: manual-updated
+
+    CommunityListResponse:
+      type: object
+      required:
+        - communities
+      properties:
+        communities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Community'
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+
+    ErrorBody:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: invalid_community
+
+        message:
+          type: string
+          description: Human-readable error message.
+          example: Community request is invalid.
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Current liveness or readiness state.
+          enum:
+            - healthy
+            - ready
+            - unhealthy
+          example: healthy
+
+        checks:
+          type: array
+          description: Dependency check results. Present on readiness responses when checks are available.
+          items:
+            $ref: '#/components/schemas/HealthCheck'
+
+    HealthCheck:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Name of the dependency check.
+          example: database
+
+        error:
+          type: string
+          description: Error description when the check is unhealthy.
+          example: database unavailable
+
+    VersionResponse:
+      type: object
+      required:
+        - version
+        - git_commit
+        - build_date
+      properties:
+        version:
+          type: string
+          description: Application version.
+          example: 0.1.2
+
+        git_commit:
+          type: string
+          description: Git commit associated with the build.
+          example: local
+
+        build_date:
+          type: string
+          format: date-time
+          description: Build timestamp.
+
+    StatusResponse:
+      type: object
+      required:
+        - status
+        - version
+        - build_date
+        - go_version
+        - uptime
+        - started_at
+        - git_commit
+      properties:
+        status:
+          type: string
+          example: running
+
+        version:
+          type: string
+          example: 0.1.2
+
+        build_date:
+          type: string
+          format: date-time
+          description: Application build timestamp.
+
+        go_version:
+          type: string
+          example: go1.26.5
+
+        uptime:
+          type: string
+          description: Process uptime rendered as a Go duration string.
+          example: 1h23m45s
+
+        started_at:
+          type: string
+          format: date-time
+          description: Time the application process started.
+
+        git_commit:
+          type: string
+          example: local
