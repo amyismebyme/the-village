@@ -34,7 +34,7 @@ func TestBuildInfoMetric(t *testing.T) {
 		"environment": "dev",
 		"git_commit":  "local",
 		"go_version":  "go1.26.5",
-		"version":     "0.1.2",
+		"version":     "0.7.8",
 	}).Set(1)
 
 	families, err := registry.Gather()
@@ -78,7 +78,7 @@ func TestBuildInfoMetric(t *testing.T) {
 			"environment": "dev",
 			"git_commit":  "local",
 			"go_version":  "go1.26.5",
-			"version":     "0.1.2",
+			"version":     "0.7.8",
 		}
 
 		if len(metric.GetLabel()) != len(expectedLabels) {
