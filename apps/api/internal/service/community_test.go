@@ -3,9 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/validation"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
 	"testing"
 )
 
@@ -399,5 +403,890 @@ func TestCommunityServiceCreatePreservesSlugValidationCause(
 			"expected validation.ErrInvalidSlug to be preserved, got %v",
 			err,
 		)
+	}
+}
+
+func TestCreateCommunityIncrementsMetric(t *testing.T) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityCreateTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("success"),
+	)
+
+	community := &model.Community{
+		Name:        "Toronto Men's Group",
+		Slug:        "Toronto-Men",
+		Description: "Helping men connect",
+	}
+
+	if err := svc.Create(
+		context.Background(),
+		community,
+	); err != nil {
+		t.Fatalf(
+			"Create failed: %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected create metric to increase by 1, got %v",
+			got,
+		)
+	}
+}
+
+func TestCreateCommunityFailureDoesNotIncrementMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	repo.createErr = errors.New(
+		"database unavailable",
+	)
+
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityCreateTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("success"),
+	)
+
+	community := &model.Community{
+		Name: "Toronto Men's Group",
+		Slug: "toronto-men",
+	}
+
+	err := svc.Create(
+		context.Background(),
+		community,
+	)
+
+	if err == nil {
+		t.Fatal(
+			"expected Create to return repository error",
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected successful create metric to remain unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestCreateCommunityValidationFailureDoesNotIncrementMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityCreateTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("success"),
+	)
+
+	community := &model.Community{
+		Name: "",
+		Slug: "valid-community",
+	}
+
+	err := svc.Create(
+		context.Background(),
+		community,
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidCommunity,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected successful create metric to remain unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestUpdateCommunityIncrementsMetric(t *testing.T) {
+	repo := newMockCommunityRepository()
+
+	// Update() currently checks that the community exists before
+	// performing the update, so seed the mock repository first.
+	repo.communities[1] = &model.Community{
+		ID:             1,
+		Name:           "Toronto Men",
+		Slug:           "toronto-men",
+		Description:    "Original community",
+		ExternalSource: "integration",
+	}
+
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityUpdateTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("success"),
+	)
+
+	community := &model.Community{
+		ID:             1,
+		Name:           "Toronto Men Updated",
+		Slug:           "toronto-men-updated",
+		Description:    "Updated community",
+		ExternalSource: "integration-updated",
+	}
+
+	if err := svc.Update(
+		context.Background(),
+		community,
+	); err != nil {
+		t.Fatalf(
+			"Update failed: %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected update metric to increase by 1, got %v",
+			got,
+		)
+	}
+}
+
+func TestUpdateCommunityFailureDoesNotIncrementMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	repo.updateErr = errors.New("database unavailable")
+
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityUpdateTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("success"),
+	)
+
+	err := svc.Update(
+		context.Background(),
+		&model.Community{
+			ID:   1,
+			Name: "Toronto Men Updated",
+			Slug: "toronto-men-updated",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected Update to return repository error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected successful update metric to remain unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestUpdateCommunityNotFoundDoesNotIncrementMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityUpdateTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("success"),
+	)
+
+	err := svc.Update(
+		context.Background(),
+		&model.Community{
+			ID:   999,
+			Name: "Missing Community",
+			Slug: "missing-community",
+		},
+	)
+
+	if !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf(
+			"expected repository.ErrNotFound, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected successful update metric to remain unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestDeleteCommunityIncrementsMetric(t *testing.T) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityDeleteTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("success"),
+	)
+
+	if err := svc.Delete(
+		context.Background(),
+		1,
+	); err != nil {
+		t.Fatalf(
+			"Delete failed: %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected delete metric to increase by 1, got %v",
+			got,
+		)
+	}
+}
+
+func TestDeleteCommunityNotFoundDoesNotIncrementMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityDeleteTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("success"),
+	)
+
+	err := svc.Delete(
+		context.Background(),
+		999,
+	)
+
+	if !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf(
+			"expected repository.ErrNotFound, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected successful delete metric to remain unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestDeleteCommunityFailureDoesNotIncrementMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	repo.deleteErr = errors.New("database unavailable")
+
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityDeleteTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("success"),
+	)
+
+	err := svc.Delete(
+		context.Background(),
+		1,
+	)
+
+	if err == nil {
+		t.Fatal("expected Delete to return repository error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected successful delete metric to remain unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestCommunityValidationFailureIncrementsMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityValidationFailuresTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("name"),
+	)
+
+	err := svc.Create(
+		context.Background(),
+		&model.Community{
+			Name: "",
+			Slug: "valid-community",
+		},
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidCommunity,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("name"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected name validation metric to increase by 1, got %v",
+			got,
+		)
+	}
+}
+
+func TestCommunitySlugValidationFailureIncrementsMetric(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	metrics.CommunityValidationFailuresTotal.Reset()
+
+	before := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("slug"),
+	)
+
+	err := svc.Create(
+		context.Background(),
+		&model.Community{
+			Name: "Toronto Men",
+			Slug: "Invalid Slug",
+		},
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidCommunity,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("slug"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected slug validation metric to increase by 1, got %v",
+			got,
+		)
+	}
+}
+
+func TestCreateCommunityMetricSuccess(t *testing.T) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.
+			WithLabelValues("success"),
+	)
+
+	community := &model.Community{
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	if err := svc.Create(
+		context.Background(),
+		community,
+	); err != nil {
+		t.Fatalf(
+			"Create failed: %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected create metric +1, got %v",
+			got,
+		)
+	}
+}
+
+func TestCreateCommunityMetricFailureDoesNotIncrementSuccess(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	repo.createErr = errors.New(
+		"database unavailable",
+	)
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.
+			WithLabelValues("success"),
+	)
+
+	err := svc.Create(
+		context.Background(),
+		&model.Community{
+			Name: "Toronto Men",
+			Slug: "toronto-men",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected Create error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected create success metric unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestUpdateCommunityMetricSuccess(t *testing.T) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.
+			WithLabelValues("success"),
+	)
+
+	community := &model.Community{
+		ID:   1,
+		Name: "Toronto Men Updated",
+		Slug: "toronto-men-updated",
+	}
+
+	if err := svc.Update(
+		context.Background(),
+		community,
+	); err != nil {
+		t.Fatalf(
+			"Update failed: %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected update metric +1, got %v",
+			got,
+		)
+	}
+}
+
+func TestUpdateCommunityMetricFailureDoesNotIncrementSuccess(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	repo.updateErr = errors.New(
+		"database unavailable",
+	)
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.
+			WithLabelValues("success"),
+	)
+
+	err := svc.Update(
+		context.Background(),
+		&model.Community{
+			ID:   1,
+			Name: "Toronto Men Updated",
+			Slug: "toronto-men-updated",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected Update error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected update success metric unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestDeleteCommunityMetricSuccess(t *testing.T) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	if err := svc.Delete(
+		context.Background(),
+		1,
+	); err != nil {
+		t.Fatalf(
+			"Delete failed: %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected delete metric +1, got %v",
+			got,
+		)
+	}
+}
+
+func TestDeleteCommunityMetricNotFoundDoesNotIncrementSuccess(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	err := svc.Delete(
+		context.Background(),
+		999,
+	)
+
+	if !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf(
+			"expected repository.ErrNotFound, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected delete success metric unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestDeleteCommunityMetricFailureDoesNotIncrementSuccess(
+	t *testing.T,
+) {
+	repo := newMockCommunityRepository()
+
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+
+	repo.deleteErr = errors.New(
+		"database unavailable",
+	)
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	err := svc.Delete(
+		context.Background(),
+		1,
+	)
+
+	if err == nil {
+		t.Fatal("expected Delete error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := after - before; got != 0 {
+		t.Fatalf(
+			"expected delete success metric unchanged, got %v",
+			got,
+		)
+	}
+}
+
+func TestCommunityValidationFailureMetricName(t *testing.T) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("name"),
+	)
+
+	err := svc.Create(
+		context.Background(),
+		&model.Community{
+			Name: "",
+			Slug: "valid-community",
+		},
+	)
+
+	if !errors.Is(err, ErrInvalidCommunity) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("name"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected name validation metric +1, got %v",
+			got,
+		)
+	}
+}
+
+func TestCommunityValidationFailureMetricSlug(t *testing.T) {
+	repo := newMockCommunityRepository()
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("slug"),
+	)
+
+	err := svc.Create(
+		context.Background(),
+		&model.Community{
+			Name: "Toronto Men",
+			Slug: "Invalid Slug",
+		},
+	)
+
+	if !errors.Is(err, ErrInvalidCommunity) {
+		t.Fatalf(
+			"expected ErrInvalidCommunity, got %v",
+			err,
+		)
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("slug"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf(
+			"expected slug validation metric +1, got %v",
+			got,
+		)
+	}
+}
+
+func TestCommunityValidationMetricDoesNotExposeValidationMessage(
+	t *testing.T,
+) {
+	registry := prometheus.NewRegistry()
+
+	collector := metrics.CommunityValidationFailuresTotal
+
+	if err := registry.Register(collector); err != nil {
+		t.Fatalf(
+			"register validation metric: %v",
+			err,
+		)
+	}
+
+	collector.
+		WithLabelValues("name").
+		Inc()
+
+	families, err := registry.Gather()
+	if err != nil {
+		t.Fatalf(
+			"gather validation metric: %v",
+			err,
+		)
+	}
+
+	for _, family := range families {
+		if family.GetName() !=
+			"village_community_validation_failures_total" {
+			continue
+		}
+
+		for _, metric := range family.GetMetric() {
+			for _, label := range metric.GetLabel() {
+				if label.GetName() != "field" {
+					t.Fatalf(
+						"unexpected validation metric label %q",
+						label.GetName(),
+					)
+				}
+
+				if label.GetValue() == "name: value is too short" {
+					t.Fatalf(
+						"raw validation message leaked into metric label",
+					)
+				}
+			}
+		}
 	}
 }

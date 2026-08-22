@@ -398,6 +398,7 @@ func newIntegrationAppWithLogger(
 
 	handler := handlers.NewHandler(
 		communityService,
+		appLogger,
 	)
 
 	healthRegistry := health.NewRegistry()

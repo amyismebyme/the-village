@@ -94,6 +94,7 @@ func Run() error {
 
 	handler := handlers.NewHandler(
 		communityService,
+		appLogger,
 	)
 
 	//------------------------------------------------------------------

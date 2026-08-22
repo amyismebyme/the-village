@@ -530,3 +530,342 @@ func TestCommunityAPIObservabilityCorrelation(t *testing.T) {
 		}
 	}
 }
+
+func TestCommunityObservabilityLifecycle(
+	t *testing.T,
+) {
+	var logs bytes.Buffer
+
+	logger := slog.New(
+		slog.NewTextHandler(
+			&logs,
+			&slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			},
+		),
+	)
+
+	app := newIntegrationAppWithLogger(
+		t,
+		logger,
+	)
+
+	// ---------------------------------------------------------------------
+	// CREATE
+	// ---------------------------------------------------------------------
+
+	createBefore := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.
+			WithLabelValues("success"),
+	)
+
+	createBody := `{
+		"name": "Observability Lifecycle",
+		"slug": "observability-lifecycle",
+		"description": "Observability integration test",
+		"external_source": "integration"
+	}`
+
+	createResp := integrationRequest(
+		t,
+		app,
+		http.MethodPost,
+		"/api/v1/communities",
+		createBody,
+	)
+
+	requireJSONResponse(
+		t,
+		createResp,
+		http.StatusCreated,
+	)
+
+	createRequestID := requireRequestID(
+		t,
+		createResp,
+	)
+
+	created := decodeCommunity(
+		t,
+		createResp,
+	)
+
+	createAfter := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := createAfter - createBefore; got != 1 {
+		t.Fatalf(
+			"expected create metric +1, got %v",
+			got,
+		)
+	}
+
+	// ---------------------------------------------------------------------
+	// UPDATE
+	// ---------------------------------------------------------------------
+
+	updateBefore := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.
+			WithLabelValues("success"),
+	)
+
+	updateBody := `{
+		"name": "Observability Lifecycle Updated",
+		"slug": "observability-lifecycle-updated",
+		"description": "Updated observability test",
+		"external_source": "integration-updated"
+	}`
+
+	updateResp := integrationRequest(
+		t,
+		app,
+		http.MethodPut,
+		communityPath(created.ID),
+		updateBody,
+	)
+
+	requireJSONResponse(
+		t,
+		updateResp,
+		http.StatusOK,
+	)
+
+	updateRequestID := requireRequestID(
+		t,
+		updateResp,
+	)
+
+	_ = decodeCommunity(
+		t,
+		updateResp,
+	)
+
+	updateAfter := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := updateAfter - updateBefore; got != 1 {
+		t.Fatalf(
+			"expected update metric +1, got %v",
+			got,
+		)
+	}
+
+	// ---------------------------------------------------------------------
+	// DELETE
+	// ---------------------------------------------------------------------
+
+	deleteBefore := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	deleteResp := integrationRequest(
+		t,
+		app,
+		http.MethodDelete,
+		communityPath(created.ID),
+		"",
+	)
+
+	if deleteResp.StatusCode != http.StatusNoContent {
+		defer deleteResp.Body.Close()
+
+		t.Fatalf(
+			"expected DELETE status %d, got %d",
+			http.StatusNoContent,
+			deleteResp.StatusCode,
+		)
+	}
+
+	deleteResp.Body.Close()
+
+	deleteAfter := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.
+			WithLabelValues("success"),
+	)
+
+	if got := deleteAfter - deleteBefore; got != 1 {
+		t.Fatalf(
+			"expected delete metric +1, got %v",
+			got,
+		)
+	}
+
+	// ---------------------------------------------------------------------
+	// VALIDATION FAILURE
+	// ---------------------------------------------------------------------
+
+	validationBefore := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("name"),
+	)
+
+	invalidBody := `{
+		"name": "",
+		"slug": "valid-validation-slug"
+	}`
+
+	validationResp := integrationRequest(
+		t,
+		app,
+		http.MethodPost,
+		"/api/v1/communities",
+		invalidBody,
+	)
+
+	requireJSONResponse(
+		t,
+		validationResp,
+		http.StatusBadRequest,
+	)
+
+	validationRequestID := requireRequestID(
+		t,
+		validationResp,
+	)
+
+	validationResp.Body.Close()
+
+	validationAfter := testutil.ToFloat64(
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues("name"),
+	)
+
+	if got := validationAfter - validationBefore; got != 1 {
+		t.Fatalf(
+			"expected name validation metric +1, got %v",
+			got,
+		)
+	}
+
+	// ---------------------------------------------------------------------
+	// LOG CORRELATION
+	// ---------------------------------------------------------------------
+
+	logOutput := logs.String()
+
+	expectedLogs := []string{
+		"operation=create",
+		"operation=update",
+		"operation=delete",
+
+		"community_id=",
+		"request_id=" + createRequestID,
+		"request_id=" + updateRequestID,
+		"request_id=" + validationRequestID,
+
+		"status=201",
+		"status=200",
+		"status=204",
+		"status=400",
+
+		"duration_ms=",
+	}
+
+	for _, expected := range expectedLogs {
+		if !strings.Contains(
+			logOutput,
+			expected,
+		) {
+			t.Fatalf(
+				"expected logs to contain %q; got:\n%s",
+				expected,
+				logOutput,
+			)
+		}
+	}
+
+	// Confirm that raw request data isn't being logged.
+	for _, forbidden := range []string{
+		"Authorization",
+		"Bearer",
+		"password",
+		"token",
+	} {
+		if strings.Contains(
+			logOutput,
+			forbidden,
+		) {
+			t.Fatalf(
+				"sensitive data %q appeared in logs:\n%s",
+				forbidden,
+				logOutput,
+			)
+		}
+	}
+}
+
+func TestCommunityMetricsExposedByMetricsEndpoint(
+	t *testing.T,
+) {
+	app := newIntegrationApp(t)
+
+	// Instantiate the metric vectors so the families are exposed even
+	// if this test runs against an otherwise empty application.
+	metrics.CommunityCreateTotal.
+		WithLabelValues("success").
+		Add(0)
+
+	metrics.CommunityUpdateTotal.
+		WithLabelValues("success").
+		Add(0)
+
+	metrics.CommunityDeleteTotal.
+		WithLabelValues("success").
+		Add(0)
+
+	metrics.CommunityValidationFailuresTotal.
+		WithLabelValues("name").
+		Add(0)
+
+	resp, err := app.server.Client().Get(
+		app.server.URL + "/metrics",
+	)
+	if err != nil {
+		t.Fatalf(
+			"GET /metrics failed: %v",
+			err,
+		)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf(
+			"expected /metrics status %d, got %d",
+			http.StatusOK,
+			resp.StatusCode,
+		)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf(
+			"read /metrics response: %v",
+			err,
+		)
+	}
+
+	output := string(body)
+
+	expected := []string{
+		"village_community_create_total",
+		"village_community_update_total",
+		"village_community_delete_total",
+		"village_community_validation_failures_total",
+	}
+
+	for _, metricName := range expected {
+		if !strings.Contains(output, metricName) {
+			t.Fatalf(
+				"expected /metrics to expose %s; got:\n%s",
+				metricName,
+				output,
+			)
+		}
+	}
+}
