@@ -531,7 +531,6 @@ func TestCommunityAPIObservabilityCorrelation(t *testing.T) {
 	}
 }
 
-
 func TestCommunityObservabilityLifecycle(
 	t *testing.T,
 ) {
@@ -799,7 +798,6 @@ func TestCommunityObservabilityLifecycle(
 		}
 	}
 }
-
 
 func TestCommunityMetricsExposedByMetricsEndpoint(
 	t *testing.T,
