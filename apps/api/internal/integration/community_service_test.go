@@ -310,7 +310,7 @@ func TestCommunityService_List(t *testing.T) {
 		}
 	}
 
-	result, err := app.service.List(ctx)
+	result, err := app.service.List(ctx, 20, 0)
 
 	if err != nil {
 		t.Fatalf(
@@ -319,10 +319,10 @@ func TestCommunityService_List(t *testing.T) {
 		)
 	}
 
-	if len(result) != 2 {
+	if len(result.Communities) != 2 {
 		t.Fatalf(
 			"expected 2 communities, got %d",
-			len(result),
+			len(result.Communities),
 		)
 	}
 }

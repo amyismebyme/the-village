@@ -119,8 +119,11 @@ paths:
       tags:
         - Communities
       summary: List communities
-      description: Returns all communities ordered according to the repository list contract.
+      description: Returns a deterministic page of communities ordered by name and ID.
       operationId: listCommunities
+      parameters:
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageOffset'
       responses:
         '200':
           description: Community collection.
@@ -140,11 +143,22 @@ paths:
                         external_source: manual
                         created_at: '2026-08-20T18:00:00Z'
                         updated_at: '2026-08-20T18:00:00Z'
+                    pagination:
+                      limit: 20
+                      offset: 0
+                      total: 1
 
                 empty:
                   summary: Empty community collection
                   value:
                     communities: []
+                    pagination:
+                      limit: 20
+                      offset: 0
+                      total: 0
+
+        '400':
+          $ref: '#/components/responses/InvalidPagination'
 
         '500':
           $ref: '#/components/responses/InternalServerError'
@@ -295,6 +309,29 @@ paths:
 
 components:
   parameters:
+    PageLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of communities to return. Defaults to 20 and may not exceed 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+
+    PageOffset:
+      name: offset
+      in: query
+      required: false
+      description: Number of communities to skip before returning results. Defaults to 0.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 0
+
     CommunityID:
       name: id
       in: path
@@ -307,6 +344,17 @@ components:
       example: 1
 
   responses:
+    InvalidPagination:
+      description: Pagination parameters are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: invalid_pagination
+              message: limit must be less than or equal to 100
+
     InvalidCommunity:
       description: The community request is invalid.
       content:
@@ -502,11 +550,36 @@ components:
       type: object
       required:
         - communities
+        - pagination
       properties:
         communities:
           type: array
           items:
             $ref: '#/components/schemas/Community'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      required:
+        - limit
+        - offset
+        - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        offset:
+          type: integer
+          minimum: 0
+          example: 0
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 123
 
     ErrorResponse:
       type: object

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
 	"github.com/amyismebyme/the-village/apps/api/internal/validation"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestWriteError(t *testing.T) {
@@ -100,16 +102,33 @@ func TestWriteCommunityServiceError(t *testing.T) {
 			expectedStatus: http.StatusInternalServerError,
 			expectedCode:   "internal_error",
 		},
+		{
+			name: "request timeout",
+			err: fmt.Errorf(
+				"database: %w",
+				context.DeadlineExceeded,
+			),
+			expectedStatus: http.StatusGatewayTimeout,
+			expectedCode:   "request_timeout",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
-			writeServiceError(
+			gotStatus := writeServiceError(
 				recorder,
 				tt.err,
 			)
+
+			if gotStatus != tt.expectedStatus {
+				t.Fatalf(
+					"expected returned status %d, got %d",
+					tt.expectedStatus,
+					gotStatus,
+				)
+			}
 
 			if recorder.Code != tt.expectedStatus {
 				t.Fatalf(
@@ -136,6 +155,53 @@ func TestWriteCommunityServiceError(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestWriteCommunityServiceErrorDoesNotExposeInternalDetails(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	raw := errors.New("pq: password=super-secret select * from communities")
+
+	writeServiceError(
+		recorder,
+		raw,
+	)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusInternalServerError,
+			recorder.Code,
+		)
+	}
+
+	body := recorder.Body.String()
+
+	for _, forbidden := range []string{
+		"super-secret",
+		"select * from communities",
+		"pq:",
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf(
+				"internal error exposed %q: %s",
+				forbidden,
+				body,
+			)
+		}
+	}
+
+	var response errorResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+
+	if response.Error.Code != "internal_error" {
+		t.Fatalf(
+			"expected internal_error, got %q",
+			response.Error.Code,
+		)
 	}
 }
 

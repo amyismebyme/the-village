@@ -11,11 +11,17 @@ import (
 	"testing"
 )
 
+const validationStatePageLimit = 100
+
 func TestCommunityAPI_ValidationFailures(t *testing.T) {
 	t.Run("missing required name", func(t *testing.T) {
 		app := newIntegrationApp(t)
 
-		before, err := app.repo.List(context.Background())
+		_, beforeTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities before request: %v",
@@ -61,7 +67,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 			)
 		}
 
-		after, err := app.repo.List(context.Background())
+		_, afterTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities after request: %v",
@@ -69,11 +79,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 			)
 		}
 
-		if len(after) != len(before) {
+		if afterTotal != beforeTotal {
 			t.Fatalf(
 				"validation failure changed database state: before=%d after=%d",
-				len(before),
-				len(after),
+				beforeTotal,
+				afterTotal,
 			)
 		}
 	})
@@ -81,7 +91,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 	t.Run("invalid slug", func(t *testing.T) {
 		app := newIntegrationApp(t)
 
-		before, err := app.repo.List(context.Background())
+		_, beforeTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities before request: %v",
@@ -109,7 +123,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 
 		resp.Body.Close()
 
-		after, err := app.repo.List(context.Background())
+		_, afterTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities after request: %v",
@@ -117,11 +135,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 			)
 		}
 
-		if len(after) != len(before) {
+		if afterTotal != beforeTotal {
 			t.Fatalf(
 				"invalid slug changed database state: before=%d after=%d",
-				len(before),
-				len(after),
+				beforeTotal,
+				afterTotal,
 			)
 		}
 	})
@@ -129,7 +147,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 	t.Run("name too short", func(t *testing.T) {
 		app := newIntegrationApp(t)
 
-		before, err := app.repo.List(context.Background())
+		_, beforeTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities before request: %v",
@@ -157,7 +179,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 
 		resp.Body.Close()
 
-		after, err := app.repo.List(context.Background())
+		_, afterTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities after request: %v",
@@ -165,11 +191,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 			)
 		}
 
-		if len(after) != len(before) {
+		if afterTotal != beforeTotal {
 			t.Fatalf(
 				"short name changed database state: before=%d after=%d",
-				len(before),
-				len(after),
+				beforeTotal,
+				afterTotal,
 			)
 		}
 	})
@@ -177,7 +203,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 	t.Run("name too long", func(t *testing.T) {
 		app := newIntegrationApp(t)
 
-		before, err := app.repo.List(context.Background())
+		_, beforeTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities before request: %v",
@@ -210,7 +240,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 
 		resp.Body.Close()
 
-		after, err := app.repo.List(context.Background())
+		_, afterTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities after request: %v",
@@ -218,11 +252,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 			)
 		}
 
-		if len(after) != len(before) {
+		if afterTotal != beforeTotal {
 			t.Fatalf(
 				"long name changed database state: before=%d after=%d",
-				len(before),
-				len(after),
+				beforeTotal,
+				afterTotal,
 			)
 		}
 	})
@@ -230,7 +264,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 	t.Run("description too long", func(t *testing.T) {
 		app := newIntegrationApp(t)
 
-		before, err := app.repo.List(context.Background())
+		_, beforeTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities before request: %v",
@@ -264,7 +302,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 
 		resp.Body.Close()
 
-		after, err := app.repo.List(context.Background())
+		_, afterTotal, err := app.repo.List(
+			context.Background(),
+			validationStatePageLimit,
+			0,
+		)
 		if err != nil {
 			t.Fatalf(
 				"list communities after request: %v",
@@ -272,11 +314,11 @@ func TestCommunityAPI_ValidationFailures(t *testing.T) {
 			)
 		}
 
-		if len(after) != len(before) {
+		if afterTotal != beforeTotal {
 			t.Fatalf(
 				"long description changed database state: before=%d after=%d",
-				len(before),
-				len(after),
+				beforeTotal,
+				afterTotal,
 			)
 		}
 	})
@@ -309,7 +351,11 @@ func TestCommunityAPI_DuplicateSlug(t *testing.T) {
 
 	first := decodeCommunity(t, firstResp)
 
-	before, err := app.repo.List(context.Background())
+	_, beforeTotal, err := app.repo.List(
+		context.Background(),
+		validationStatePageLimit,
+		0,
+	)
 	if err != nil {
 		t.Fatalf(
 			"list communities before duplicate request: %v",
@@ -359,7 +405,11 @@ func TestCommunityAPI_DuplicateSlug(t *testing.T) {
 		)
 	}
 
-	after, err := app.repo.List(context.Background())
+	_, afterTotal, err := app.repo.List(
+		context.Background(),
+		validationStatePageLimit,
+		0,
+	)
 	if err != nil {
 		t.Fatalf(
 			"list communities after duplicate request: %v",
@@ -367,11 +417,11 @@ func TestCommunityAPI_DuplicateSlug(t *testing.T) {
 		)
 	}
 
-	if len(after) != len(before) {
+	if afterTotal != beforeTotal {
 		t.Fatalf(
 			"duplicate request changed database state: before=%d after=%d",
-			len(before),
-			len(after),
+			beforeTotal,
+			afterTotal,
 		)
 	}
 
