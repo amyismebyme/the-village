@@ -1,12 +1,11 @@
 package metrics
 
 import (
-	"runtime"
-	"sync"
-
+	"errors"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
+	"runtime"
 )
 
 var RequestsTotal = prometheus.NewCounterVec(
@@ -69,6 +68,38 @@ var DatabaseQueryDuration = prometheus.NewHistogramVec(
 	},
 )
 
+var CommunityCreateTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_community_create_total",
+		Help: "Total community create operations.",
+	},
+	[]string{"status"},
+)
+
+var CommunityUpdateTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_community_update_total",
+		Help: "Total community update operations.",
+	},
+	[]string{"status"},
+)
+
+var CommunityDeleteTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_community_delete_total",
+		Help: "Total community delete operations.",
+	},
+	[]string{"status"},
+)
+
+var CommunityValidationFailuresTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_community_validation_failures_total",
+		Help: "Total Community validation failures by field.",
+	},
+	[]string{"field"},
+)
+
 var BuildInfo = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "village_build_info",
@@ -82,34 +113,49 @@ var BuildInfo = prometheus.NewGaugeVec(
 	},
 )
 
-var registerOnce sync.Once
+func Register(
+	reg prometheus.Registerer,
+	pool *pgxpool.Pool,
+) {
+	collectors := []prometheus.Collector{
+		RequestsTotal,
+		RequestDuration,
+		RequestsInFlight,
+		PanicsTotal,
+		ErrorsTotal,
+		DatabaseQueriesTotal,
+		DatabaseQueryDuration,
+		BuildInfo,
 
-func Register(reg prometheus.Registerer, pool *pgxpool.Pool) {
-	registerOnce.Do(func() {
-		collectors := []prometheus.Collector{
-			RequestsTotal,
-			RequestDuration,
-			RequestsInFlight,
-			PanicsTotal,
-			ErrorsTotal,
-			DatabaseQueriesTotal,
-			DatabaseQueryDuration,
-			BuildInfo,
+		CommunityCreateTotal,
+		CommunityUpdateTotal,
+		CommunityDeleteTotal,
+		CommunityValidationFailuresTotal,
+	}
+
+	if pool != nil {
+		collectors = append(
+			collectors,
+			NewPoolCollector(pool),
+		)
+	}
+
+	for _, collector := range collectors {
+		if err := reg.Register(collector); err != nil {
+			var alreadyRegistered prometheus.AlreadyRegisteredError
+
+			if !errors.As(err, &alreadyRegistered) {
+				panic(err)
+			}
 		}
+	}
 
-		if pool != nil {
-			collectors = append(collectors, NewPoolCollector(pool))
-		}
-
-		reg.MustRegister(collectors...)
-
-		BuildInfo.WithLabelValues(
-			appruntime.BuildVersion,
-			appruntime.GitCommit,
-			runtime.Version(),
-			appruntime.Environment,
-		).Set(1)
-	})
+	BuildInfo.WithLabelValues(
+		appruntime.BuildVersion,
+		appruntime.GitCommit,
+		runtime.Version(),
+		appruntime.Environment,
+	).Set(1)
 }
 
 type PoolCollector struct {

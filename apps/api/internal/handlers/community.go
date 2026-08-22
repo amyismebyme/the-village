@@ -1,11 +1,15 @@
 package handlers
 
 import (
-	"net/http"
-	"strconv"
-
+	"context"
+	"errors"
 	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
+	"github.com/amyismebyme/the-village/apps/api/internal/repository"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
+	"net/http"
+	"strconv"
+	"time"
 )
 
 type createCommunityRequest struct {
@@ -22,7 +26,24 @@ func (h *Handler) CreateCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	start := time.Now()
+
+	status := http.StatusInternalServerError
+	communityID := int64(0)
+
+	defer func() {
+		h.logCommunityOperation(
+			r,
+			"create",
+			communityID,
+			status,
+			start,
+		)
+	}()
+
 	if r.Method != http.MethodPost {
+		status = http.StatusMethodNotAllowed
+
 		w.Header().Set("Allow", http.MethodPost)
 
 		writeError(
@@ -37,7 +58,13 @@ func (h *Handler) CreateCommunity(
 
 	var request createCommunityRequest
 
-	if err := decodeJSON(w, r, &request); err != nil {
+	if err := decodeJSON(
+		w,
+		r,
+		&request,
+	); err != nil {
+		status = http.StatusBadRequest
+
 		writeError(
 			w,
 			http.StatusBadRequest,
@@ -59,9 +86,14 @@ func (h *Handler) CreateCommunity(
 		r.Context(),
 		community,
 	); err != nil {
+		status = serviceErrorStatus(err)
+
 		writeServiceError(w, err)
 		return
 	}
+
+	communityID = community.ID
+	status = http.StatusCreated
 
 	httputil.WriteJSON(
 		w,
@@ -185,7 +217,24 @@ func (h *Handler) UpdateCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	start := time.Now()
+
+	status := http.StatusInternalServerError
+	communityID := int64(0)
+
+	defer func() {
+		h.logCommunityOperation(
+			r,
+			"update",
+			communityID,
+			status,
+			start,
+		)
+	}()
+
 	if r.Method != http.MethodPut {
+		status = http.StatusMethodNotAllowed
+
 		w.Header().Set("Allow", http.MethodPut)
 
 		writeError(
@@ -204,6 +253,8 @@ func (h *Handler) UpdateCommunity(
 		64,
 	)
 	if err != nil || id <= 0 {
+		status = http.StatusBadRequest
+
 		writeError(
 			w,
 			http.StatusBadRequest,
@@ -214,6 +265,8 @@ func (h *Handler) UpdateCommunity(
 		return
 	}
 
+	communityID = id
+
 	var request createCommunityRequest
 
 	if err := decodeJSON(
@@ -221,6 +274,8 @@ func (h *Handler) UpdateCommunity(
 		r,
 		&request,
 	); err != nil {
+		status = http.StatusBadRequest
+
 		writeError(
 			w,
 			http.StatusBadRequest,
@@ -243,9 +298,13 @@ func (h *Handler) UpdateCommunity(
 		r.Context(),
 		community,
 	); err != nil {
+		status = serviceErrorStatus(err)
+
 		writeServiceError(w, err)
 		return
 	}
+
+	status = http.StatusOK
 
 	httputil.WriteJSON(
 		w,
@@ -261,7 +320,24 @@ func (h *Handler) DeleteCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	start := time.Now()
+
+	status := http.StatusInternalServerError
+	communityID := int64(0)
+
+	defer func() {
+		h.logCommunityOperation(
+			r,
+			"delete",
+			communityID,
+			status,
+			start,
+		)
+	}()
+
 	if r.Method != http.MethodDelete {
+		status = http.StatusMethodNotAllowed
+
 		w.Header().Set("Allow", http.MethodDelete)
 
 		writeError(
@@ -280,6 +356,8 @@ func (h *Handler) DeleteCommunity(
 		64,
 	)
 	if err != nil || id <= 0 {
+		status = http.StatusBadRequest
+
 		writeError(
 			w,
 			http.StatusBadRequest,
@@ -290,13 +368,41 @@ func (h *Handler) DeleteCommunity(
 		return
 	}
 
+	communityID = id
+
 	if err := h.communityService.Delete(
 		r.Context(),
 		id,
 	); err != nil {
+		status = serviceErrorStatus(err)
+
 		writeServiceError(w, err)
 		return
 	}
 
+	status = http.StatusNoContent
+
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func serviceErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return http.StatusGatewayTimeout
+
+	case errors.Is(err, service.ErrInvalidCommunityID):
+		return http.StatusBadRequest
+
+	case errors.Is(err, service.ErrInvalidCommunity):
+		return http.StatusBadRequest
+
+	case errors.Is(err, service.ErrCommunityAlreadyExists):
+		return http.StatusConflict
+
+	case errors.Is(err, repository.ErrNotFound):
+		return http.StatusNotFound
+
+	default:
+		return http.StatusInternalServerError
+	}
 }

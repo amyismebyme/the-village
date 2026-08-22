@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
+	"strings"
 )
 
 type CommunityService interface {
@@ -97,7 +98,12 @@ func (s *communityService) Create(
 		)
 	}
 
+	metrics.CommunityCreateTotal.
+		WithLabelValues("success").
+		Inc()
+
 	return nil
+
 }
 
 func (s *communityService) Get(
@@ -185,7 +191,14 @@ func (s *communityService) Update(
 		}
 	}
 
-	if err := s.repository.Update(ctx, community); err != nil {
+	if err := s.repository.Update(
+		ctx,
+		community,
+	); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return repository.ErrNotFound
+		}
+
 		if errors.Is(err, repository.ErrAlreadyExists) {
 			return fmt.Errorf(
 				"%w: slug %q",
@@ -195,13 +208,17 @@ func (s *communityService) Update(
 		}
 
 		return fmt.Errorf(
-			"community service: update community %d: %w",
-			community.ID,
+			"community service: update community: %w",
 			err,
 		)
 	}
 
+	metrics.CommunityUpdateTotal.
+		WithLabelValues("success").
+		Inc()
+
 	return nil
+
 }
 
 func (s *communityService) Delete(
@@ -212,13 +229,32 @@ func (s *communityService) Delete(
 		return ErrInvalidCommunityID
 	}
 
-	if err := s.repository.Delete(ctx, id); err != nil {
+	if _, err := s.repository.FindByID(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return repository.ErrNotFound
+		}
+
 		return fmt.Errorf(
-			"community service: delete community %d: %w",
+			"community service: find community %d: %w",
 			id,
 			err,
 		)
 	}
+
+	if err := s.repository.Delete(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return repository.ErrNotFound
+		}
+
+		return fmt.Errorf(
+			"community service: delete community: %w",
+			err,
+		)
+	}
+
+	metrics.CommunityDeleteTotal.
+		WithLabelValues("success").
+		Inc()
 
 	return nil
 }
@@ -234,6 +270,10 @@ func validateCommunity(
 	}
 
 	if err := c.Validate(); err != nil {
+		metrics.CommunityValidationFailuresTotal.
+			WithLabelValues(validationField(err)).
+			Inc()
+
 		return fmt.Errorf(
 			"%w: %w",
 			ErrInvalidCommunity,
@@ -261,5 +301,39 @@ func (s *communityService) slugExists(
 
 	default:
 		return nil, err
+	}
+}
+
+func validationField(err error) string {
+	if err == nil {
+		return "unknown"
+	}
+
+	message := err.Error()
+
+	field, _, ok := strings.Cut(
+		message,
+		":",
+	)
+
+	if !ok {
+		return "unknown"
+	}
+
+	switch field {
+	case "name":
+		return "name"
+
+	case "slug":
+		return "slug"
+
+	case "description":
+		return "description"
+
+	case "external_source":
+		return "external_source"
+
+	default:
+		return "unknown"
 	}
 }
