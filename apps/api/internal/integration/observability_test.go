@@ -749,6 +749,7 @@ func TestCommunityObservabilityLifecycle(
 	logOutput := logs.String()
 
 	expectedLogs := []string{
+		`msg="community operation completed"`,
 		"operation=create",
 		"operation=update",
 		"operation=delete",
@@ -797,32 +798,21 @@ func TestCommunityObservabilityLifecycle(
 			)
 		}
 	}
-}
+	// Community operation logs must be distinguishable from the generic
+	// request-completed log.
+	if !strings.Contains(
+		logOutput,
+		`msg="community operation completed"`,
+	) {
+		t.Fatalf(
+			"expected community operation completion log, got:\n%s",
+			logOutput,
+		)
+	}
 
-func TestCommunityMetricsExposedByMetricsEndpoint(
-	t *testing.T,
-) {
-	app := newIntegrationApp(t)
-
-	// Instantiate the metric vectors so the families are exposed even
-	// if this test runs against an otherwise empty application.
-	metrics.CommunityCreateTotal.
-		WithLabelValues("success").
-		Add(0)
-
-	metrics.CommunityUpdateTotal.
-		WithLabelValues("success").
-		Add(0)
-
-	metrics.CommunityDeleteTotal.
-		WithLabelValues("success").
-		Add(0)
-
-	metrics.CommunityValidationFailuresTotal.
-		WithLabelValues("name").
-		Add(0)
-
-	resp, err := app.server.Client().Get(
+	// /metrics must expose the Community metric families that the
+	// lifecycle above exercised.
+	metricsResponse, err := app.server.Client().Get(
 		app.server.URL + "/metrics",
 	)
 	if err != nil {
@@ -832,17 +822,19 @@ func TestCommunityMetricsExposedByMetricsEndpoint(
 		)
 	}
 
-	defer resp.Body.Close()
+	defer metricsResponse.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if metricsResponse.StatusCode != http.StatusOK {
 		t.Fatalf(
 			"expected /metrics status %d, got %d",
 			http.StatusOK,
-			resp.StatusCode,
+			metricsResponse.StatusCode,
 		)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	metricsBody, err := io.ReadAll(
+		metricsResponse.Body,
+	)
 	if err != nil {
 		t.Fatalf(
 			"read /metrics response: %v",
@@ -850,22 +842,35 @@ func TestCommunityMetricsExposedByMetricsEndpoint(
 		)
 	}
 
-	output := string(body)
+	metricsText := string(metricsBody)
 
-	expected := []string{
+	for _, metricName := range []string{
 		"village_community_create_total",
 		"village_community_update_total",
 		"village_community_delete_total",
 		"village_community_validation_failures_total",
-	}
-
-	for _, metricName := range expected {
-		if !strings.Contains(output, metricName) {
+	} {
+		if !strings.Contains(metricsText, metricName) {
 			t.Fatalf(
 				"expected /metrics to expose %s; got:\n%s",
 				metricName,
-				output,
+				metricsText,
 			)
 		}
 	}
+
+	if strings.Contains(metricsText, `request_id="`) {
+		t.Fatalf(
+			"request_id leaked into Prometheus labels:\n%s",
+			metricsText,
+		)
+	}
+
+	if strings.Contains(metricsText, `community_id="`) {
+		t.Fatalf(
+			"community_id leaked into Prometheus labels:\n%s",
+			metricsText,
+		)
+	}
+
 }

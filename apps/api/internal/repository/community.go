@@ -24,7 +24,9 @@ type CommunityRepository interface {
 
 	List(
 		ctx context.Context,
-	) ([]*model.Community, error)
+		limit int,
+		offset int,
+	) ([]*model.Community, int64, error)
 
 	Update(
 		ctx context.Context,

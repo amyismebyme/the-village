@@ -32,7 +32,9 @@ type communityServiceMock struct {
 
 	listFunc func(
 		ctx context.Context,
-	) ([]*model.Community, error)
+		limit int,
+		offset int,
+	) (service.CommunityListResult, error)
 
 	updateFunc func(
 		ctx context.Context,
@@ -69,12 +71,18 @@ func (m *communityServiceMock) Get(
 
 func (m *communityServiceMock) List(
 	ctx context.Context,
-) ([]*model.Community, error) {
+	limit int,
+	offset int,
+) (service.CommunityListResult, error) {
 	if m.listFunc != nil {
-		return m.listFunc(ctx)
+		return m.listFunc(ctx, limit, offset)
 	}
 
-	return nil, nil
+	return service.CommunityListResult{
+		Communities: []*model.Community{},
+		Limit:       limit,
+		Offset:      offset,
+	}, nil
 }
 
 func (m *communityServiceMock) Update(
@@ -159,6 +167,11 @@ func decodeCommunityListResponse(
 
 	var response struct {
 		Communities []communityResponse `json:"communities"`
+		Pagination  struct {
+			Limit  int   `json:"limit"`
+			Offset int   `json:"offset"`
+			Total  int64 `json:"total"`
+		} `json:"pagination"`
 	}
 
 	if err := json.NewDecoder(
@@ -171,6 +184,15 @@ func decodeCommunityListResponse(
 	}
 
 	return response.Communities
+}
+
+type communityListResponse struct {
+	Communities []communityResponse `json:"communities"`
+	Pagination  struct {
+		Limit  int   `json:"limit"`
+		Offset int   `json:"offset"`
+		Total  int64 `json:"total"`
+	} `json:"pagination"`
 }
 
 // -----------------------------------------------------------------------------
@@ -616,8 +638,15 @@ func TestListCommunities(t *testing.T) {
 	mockService := &communityServiceMock{
 		listFunc: func(
 			ctx context.Context,
-		) ([]*model.Community, error) {
-			return expected, nil
+			limit int,
+			offset int,
+		) (service.CommunityListResult, error) {
+			return service.CommunityListResult{
+				Communities: expected,
+				Limit:       limit,
+				Offset:      offset,
+				Total:       int64(len(expected)),
+			}, nil
 		},
 	}
 
@@ -693,8 +722,14 @@ func TestListCommunitiesEmpty(t *testing.T) {
 	mockService := &communityServiceMock{
 		listFunc: func(
 			ctx context.Context,
-		) ([]*model.Community, error) {
-			return nil, nil
+			limit int,
+			offset int,
+		) (service.CommunityListResult, error) {
+			return service.CommunityListResult{
+				Communities: []*model.Community{},
+				Limit:       limit,
+				Offset:      offset,
+			}, nil
 		},
 	}
 
@@ -746,8 +781,10 @@ func TestListCommunitiesNilEntriesAreSkipped(t *testing.T) {
 	mockService := &communityServiceMock{
 		listFunc: func(
 			ctx context.Context,
-		) ([]*model.Community, error) {
-			return []*model.Community{
+			limit int,
+			offset int,
+		) (service.CommunityListResult, error) {
+			communities := []*model.Community{
 				{
 					ID:   1,
 					Name: "Toronto Men",
@@ -759,6 +796,13 @@ func TestListCommunitiesNilEntriesAreSkipped(t *testing.T) {
 					Name: "Mississauga Men",
 					Slug: "mississauga-men",
 				},
+			}
+
+			return service.CommunityListResult{
+				Communities: communities,
+				Limit:       limit,
+				Offset:      offset,
+				Total:       2,
 			}, nil
 		},
 	}
@@ -805,8 +849,10 @@ func TestListCommunitiesServiceError(t *testing.T) {
 	mockService := &communityServiceMock{
 		listFunc: func(
 			ctx context.Context,
-		) ([]*model.Community, error) {
-			return nil, errors.New("database unavailable")
+			limit int,
+			offset int,
+		) (service.CommunityListResult, error) {
+			return service.CommunityListResult{}, errors.New("database unavailable")
 		},
 	}
 

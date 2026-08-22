@@ -43,7 +43,7 @@ func writeError(
 func writeServiceError(
 	w http.ResponseWriter,
 	err error,
-) {
+) int {
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(
@@ -52,6 +52,16 @@ func writeServiceError(
 			"request_timeout",
 			"request timed out while processing the request",
 		)
+		return http.StatusGatewayTimeout
+
+	case errors.Is(err, service.ErrInvalidPagination):
+		writeError(
+			w,
+			http.StatusBadRequest,
+			"invalid_pagination",
+			"invalid pagination",
+		)
+		return http.StatusBadRequest
 
 	case errors.Is(err, service.ErrInvalidCommunityID):
 		writeError(
@@ -60,6 +70,7 @@ func writeServiceError(
 			"invalid_id",
 			"invalid community id",
 		)
+		return http.StatusBadRequest
 
 	case errors.Is(err, service.ErrInvalidCommunity):
 		writeError(
@@ -68,6 +79,7 @@ func writeServiceError(
 			"invalid_community",
 			validationMessage(err),
 		)
+		return http.StatusBadRequest
 
 	case errors.Is(err, service.ErrCommunityAlreadyExists):
 		writeError(
@@ -76,6 +88,7 @@ func writeServiceError(
 			"community_already_exists",
 			"community already exists",
 		)
+		return http.StatusConflict
 
 	case errors.Is(err, repository.ErrNotFound):
 		writeError(
@@ -84,6 +97,7 @@ func writeServiceError(
 			"community_not_found",
 			"community not found",
 		)
+		return http.StatusNotFound
 
 	default:
 		writeError(
@@ -92,6 +106,7 @@ func writeServiceError(
 			"internal_error",
 			"internal server error",
 		)
+		return http.StatusInternalServerError
 	}
 }
 

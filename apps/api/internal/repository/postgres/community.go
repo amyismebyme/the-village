@@ -30,7 +30,9 @@ func NewCommunityRepository(
 
 func (r *CommunityRepository) List(
 	ctx context.Context,
-) (communities []*model.Community, err error) {
+	limit int,
+	offset int,
+) (communities []*model.Community, total int64, err error) {
 
 	start := time.Now()
 
@@ -40,6 +42,15 @@ func (r *CommunityRepository) List(
 
 	ctx, cancel := r.withQueryTimeout(ctx)
 	defer cancel()
+
+	const countQuery = `
+SELECT COUNT(*)
+FROM communities;
+`
+
+	if err = r.Pool().QueryRow(ctx, countQuery).Scan(&total); err != nil {
+		return nil, 0, translateError(err)
+	}
 
 	const query = `
 SELECT
@@ -51,29 +62,31 @@ SELECT
     created_at,
     updated_at
 FROM communities
-ORDER BY name;
+ORDER BY name, id
+LIMIT $1
+OFFSET $2;
 `
 
-	rows, err := r.Pool().Query(ctx, query)
+	rows, err := r.Pool().Query(
+		ctx,
+		query,
+		limit,
+		offset,
+	)
 	if err != nil {
-		return nil, translateError(err)
+		return nil, 0, translateError(err)
 	}
-	defer rows.Close()
 
 	communities, err = scanCommunities(rows)
 	if err != nil {
-		return nil, translateError(err)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, translateError(err)
+		return nil, 0, translateError(err)
 	}
 
 	if communities == nil {
 		communities = []*model.Community{}
 	}
 
-	return communities, nil
+	return communities, total, nil
 }
 
 func (r *CommunityRepository) FindByID(

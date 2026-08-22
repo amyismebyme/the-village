@@ -1,15 +1,13 @@
 package handlers
 
 import (
-	"context"
-	"errors"
-	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
-	"github.com/amyismebyme/the-village/apps/api/internal/model"
-	"github.com/amyismebyme/the-village/apps/api/internal/repository"
-	"github.com/amyismebyme/the-village/apps/api/internal/service"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
+	"github.com/amyismebyme/the-village/apps/api/internal/model"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
 
 type createCommunityRequest struct {
@@ -86,9 +84,7 @@ func (h *Handler) CreateCommunity(
 		r.Context(),
 		community,
 	); err != nil {
-		status = serviceErrorStatus(err)
-
-		writeServiceError(w, err)
+		status = writeServiceError(w, err)
 		return
 	}
 
@@ -122,27 +118,68 @@ func (h *Handler) ListCommunities(
 		return
 	}
 
-	communities, err := h.communityService.List(
+	limit := service.DefaultCommunityPageLimit
+	offset := 0
+
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			writeError(
+				w,
+				http.StatusBadRequest,
+				"invalid_pagination",
+				"limit must be a positive integer",
+			)
+			return
+		}
+
+		limit = parsed
+	}
+
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 {
+			writeError(
+				w,
+				http.StatusBadRequest,
+				"invalid_pagination",
+				"offset must be a non-negative integer",
+			)
+			return
+		}
+
+		offset = parsed
+	}
+
+	page, err := h.communityService.List(
 		r.Context(),
+		limit,
+		offset,
 	)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	if communities == nil {
-		communities = []*model.Community{}
-	}
-
 	response := struct {
 		Communities []communityResponse `json:"communities"`
+		Pagination  struct {
+			Limit  int   `json:"limit"`
+			Offset int   `json:"offset"`
+			Total  int64 `json:"total"`
+		} `json:"pagination"`
 	}{
-		Communities: newCommunityResponses(communities),
+		Communities: newCommunityResponses(page.Communities),
 	}
 
+	response.Pagination.Limit = page.Limit
+	response.Pagination.Offset = page.Offset
+	response.Pagination.Total = page.Total
+
+	httpStatus := http.StatusOK
 	httputil.WriteJSON(
 		w,
-		http.StatusOK,
+		httpStatus,
 		response,
 	)
 }
@@ -298,9 +335,7 @@ func (h *Handler) UpdateCommunity(
 		r.Context(),
 		community,
 	); err != nil {
-		status = serviceErrorStatus(err)
-
-		writeServiceError(w, err)
+		status = writeServiceError(w, err)
 		return
 	}
 
@@ -374,35 +409,11 @@ func (h *Handler) DeleteCommunity(
 		r.Context(),
 		id,
 	); err != nil {
-		status = serviceErrorStatus(err)
-
-		writeServiceError(w, err)
+		status = writeServiceError(w, err)
 		return
 	}
 
 	status = http.StatusNoContent
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func serviceErrorStatus(err error) int {
-	switch {
-	case errors.Is(err, context.DeadlineExceeded):
-		return http.StatusGatewayTimeout
-
-	case errors.Is(err, service.ErrInvalidCommunityID):
-		return http.StatusBadRequest
-
-	case errors.Is(err, service.ErrInvalidCommunity):
-		return http.StatusBadRequest
-
-	case errors.Is(err, service.ErrCommunityAlreadyExists):
-		return http.StatusConflict
-
-	case errors.Is(err, repository.ErrNotFound):
-		return http.StatusNotFound
-
-	default:
-		return http.StatusInternalServerError
-	}
 }
