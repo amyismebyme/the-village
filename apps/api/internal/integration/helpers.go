@@ -49,6 +49,11 @@ type integrationCommunityResponse struct {
 
 type integrationCommunityListResponse struct {
 	Communities []integrationCommunityResponse `json:"communities"`
+	Pagination  struct {
+		Limit  int   `json:"limit"`
+		Offset int   `json:"offset"`
+		Total  int64 `json:"total"`
+	} `json:"pagination"`
 }
 
 var integrationEnvOnce sync.Once

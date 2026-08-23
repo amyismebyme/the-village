@@ -54,6 +54,15 @@ func writeServiceError(
 		)
 		return http.StatusGatewayTimeout
 
+	case errors.Is(err, service.ErrInvalidPagination):
+		writeError(
+			w,
+			http.StatusBadRequest,
+			"invalid_pagination",
+			"invalid pagination",
+		)
+		return http.StatusBadRequest
+
 	case errors.Is(err, service.ErrInvalidCommunityID):
 		writeError(
 			w,

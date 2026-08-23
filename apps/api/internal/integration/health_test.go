@@ -16,6 +16,7 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
 )
 
 type stubCommunityService struct{}
@@ -36,8 +37,14 @@ func (stubCommunityService) Get(
 
 func (stubCommunityService) List(
 	_ context.Context,
-) ([]*model.Community, error) {
-	return nil, nil
+	limit int,
+	offset int,
+) (service.CommunityListResult, error) {
+	return service.CommunityListResult{
+		Communities: []*model.Community{},
+		Limit:       limit,
+		Offset:      offset,
+	}, nil
 }
 
 func (stubCommunityService) Update(

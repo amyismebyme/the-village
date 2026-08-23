@@ -319,8 +319,10 @@ func TestCommunityRepositoryList(t *testing.T) {
 		)
 	}
 
-	communities, err := app.repo.List(
+	communities, _, err := app.repo.List(
 		context.Background(),
+		100,
+		0,
 	)
 	if err != nil {
 		t.Fatalf(
@@ -346,8 +348,10 @@ func TestCommunityRepositoryList(t *testing.T) {
 func TestCommunityRepositoryListEmpty(t *testing.T) {
 	app := newCommunityRepositoryTestApp(t)
 
-	communities, err := app.repo.List(
+	communities, _, err := app.repo.List(
 		context.Background(),
+		100,
+		0,
 	)
 	if err != nil {
 		t.Fatalf(
@@ -378,7 +382,7 @@ func TestCommunityRepositoryListCancelled(t *testing.T) {
 	)
 	cancel()
 
-	_, err := app.repo.List(ctx)
+	_, _, err := app.repo.List(ctx, 100, 0)
 
 	if !errors.Is(
 		err,

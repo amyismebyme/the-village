@@ -10,6 +10,18 @@ import (
 	"strings"
 )
 
+const (
+	DefaultCommunityPageLimit = 20
+	MaxCommunityPageLimit     = 100
+)
+
+type CommunityListResult struct {
+	Communities []*model.Community
+	Limit       int
+	Offset      int
+	Total       int64
+}
+
 type CommunityService interface {
 	Create(
 		ctx context.Context,
@@ -23,7 +35,9 @@ type CommunityService interface {
 
 	List(
 		ctx context.Context,
-	) ([]*model.Community, error)
+		limit int,
+		offset int,
+	) (CommunityListResult, error)
 
 	Update(
 		ctx context.Context,
@@ -128,20 +142,43 @@ func (s *communityService) Get(
 
 func (s *communityService) List(
 	ctx context.Context,
-) ([]*model.Community, error) {
-	communities, err := s.repository.List(ctx)
+	limit int,
+	offset int,
+) (CommunityListResult, error) {
+	if limit == 0 {
+		limit = DefaultCommunityPageLimit
+	}
+
+	if limit < 0 || limit > MaxCommunityPageLimit {
+		return CommunityListResult{}, ErrInvalidPagination
+	}
+
+	if offset < 0 {
+		return CommunityListResult{}, ErrInvalidPagination
+	}
+
+	communities, total, err := s.repository.List(
+		ctx,
+		limit,
+		offset,
+	)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return CommunityListResult{}, fmt.Errorf(
 			"community service: list communities: %w",
 			err,
 		)
 	}
 
 	if communities == nil {
-		return []*model.Community{}, nil
+		communities = []*model.Community{}
 	}
 
-	return communities, nil
+	return CommunityListResult{
+		Communities: communities,
+		Limit:       limit,
+		Offset:      offset,
+		Total:       total,
+	}, nil
 }
 
 func (s *communityService) Update(

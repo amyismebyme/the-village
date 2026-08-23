@@ -33,8 +33,14 @@ func (routerCommunityServiceMock) Get(
 
 func (routerCommunityServiceMock) List(
 	_ context.Context,
-) ([]*model.Community, error) {
-	return []*model.Community{}, nil
+	limit int,
+	offset int,
+) (service.CommunityListResult, error) {
+	return service.CommunityListResult{
+		Communities: []*model.Community{},
+		Limit:       limit,
+		Offset:      offset,
+	}, nil
 }
 
 func (routerCommunityServiceMock) Update(
