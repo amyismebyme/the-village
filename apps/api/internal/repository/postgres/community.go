@@ -58,14 +58,8 @@ ORDER BY name;
 	if err != nil {
 		return nil, translateError(err)
 	}
-	defer rows.Close()
-
 	communities, err = scanCommunities(rows)
 	if err != nil {
-		return nil, translateError(err)
-	}
-
-	if err := rows.Err(); err != nil {
 		return nil, translateError(err)
 	}
 

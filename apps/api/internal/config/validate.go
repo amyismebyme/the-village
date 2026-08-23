@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -28,6 +29,37 @@ func Validate(cfg Config) error {
 	case "text", "json":
 	default:
 		return fmt.Errorf("invalid log format: %s", cfg.LogFormat)
+	}
+
+	// Production requires database settings to be explicitly configured.
+	if strings.ToLower(cfg.Environment) == "production" {
+		requiredDBVars := []string{
+			"DB_HOST",
+			"DB_USER",
+			"DB_PASSWORD",
+			"DB_NAME",
+			"DB_SSLMODE",
+		}
+
+		for _, key := range requiredDBVars {
+			if os.Getenv(key) == "" {
+				return fmt.Errorf("%s must be explicitly configured in production", key)
+			}
+		}
+	}
+
+	// Database queries must complete before the request timeout.
+	if cfg.Database.QueryTimeout >= cfg.RequestTimeout {
+		return fmt.Errorf(
+			"database query timeout must be less than request timeout",
+		)
+	}
+
+	// Requests must complete before the write timeout.
+	if cfg.RequestTimeout >= cfg.WriteTimeout {
+		return fmt.Errorf(
+			"request timeout must be less than write timeout",
+		)
 	}
 
 	return nil

@@ -16,6 +16,7 @@ type Config struct {
 	LogLevel        string
 	LogFormat       string
 	ReadTimeout     time.Duration
+	RequestTimeout  time.Duration
 	WriteTimeout    time.Duration
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
@@ -31,7 +32,8 @@ func Load() Config {
 		LogLevel:        getEnv("LOG_LEVEL", "info"),
 		LogFormat:       getEnv("LOG_FORMAT", "json"),
 		ReadTimeout:     getDuration("READ_TIMEOUT", 10),
-		WriteTimeout:    getDuration("WRITE_TIMEOUT", 10),
+		RequestTimeout:  getDuration("REQUEST_TIMEOUT", 35),
+		WriteTimeout:    getDuration("WRITE_TIMEOUT", 40),
 		IdleTimeout:     getDuration("IDLE_TIMEOUT", 60),
 		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 15),
 

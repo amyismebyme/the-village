@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/amyismebyme/the-village/apps/api/internal/repository"
-	"github.com/amyismebyme/the-village/apps/api/internal/service"
-	"github.com/amyismebyme/the-village/apps/api/internal/validation"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/repository"
+	"github.com/amyismebyme/the-village/apps/api/internal/service"
+	"github.com/amyismebyme/the-village/apps/api/internal/validation"
 )
 
 func TestWriteError(t *testing.T) {
@@ -100,16 +101,33 @@ func TestWriteCommunityServiceError(t *testing.T) {
 			expectedStatus: http.StatusInternalServerError,
 			expectedCode:   "internal_error",
 		},
+		{
+			name: "request timeout",
+			err: fmt.Errorf(
+				"database: %w",
+				context.DeadlineExceeded,
+			),
+			expectedStatus: http.StatusGatewayTimeout,
+			expectedCode:   "request_timeout",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
-			writeServiceError(
+			gotStatus := writeServiceError(
 				recorder,
 				tt.err,
 			)
+
+			if gotStatus != tt.expectedStatus {
+				t.Fatalf(
+					"expected returned status %d, got %d",
+					tt.expectedStatus,
+					gotStatus,
+				)
+			}
 
 			if recorder.Code != tt.expectedStatus {
 				t.Fatalf(
