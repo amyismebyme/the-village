@@ -167,11 +167,6 @@ func decodeCommunityListResponse(
 
 	var response struct {
 		Communities []communityResponse `json:"communities"`
-		Pagination  struct {
-			Limit  int   `json:"limit"`
-			Offset int   `json:"offset"`
-			Total  int64 `json:"total"`
-		} `json:"pagination"`
 	}
 
 	if err := json.NewDecoder(
@@ -184,15 +179,6 @@ func decodeCommunityListResponse(
 	}
 
 	return response.Communities
-}
-
-type communityListResponse struct {
-	Communities []communityResponse `json:"communities"`
-	Pagination  struct {
-		Limit  int   `json:"limit"`
-		Offset int   `json:"offset"`
-		Total  int64 `json:"total"`
-	} `json:"pagination"`
 }
 
 // -----------------------------------------------------------------------------
@@ -784,25 +770,23 @@ func TestListCommunitiesNilEntriesAreSkipped(t *testing.T) {
 			limit int,
 			offset int,
 		) (service.CommunityListResult, error) {
-			communities := []*model.Community{
-				{
-					ID:   1,
-					Name: "Toronto Men",
-					Slug: "toronto-men",
-				},
-				nil,
-				{
-					ID:   2,
-					Name: "Mississauga Men",
-					Slug: "mississauga-men",
-				},
-			}
-
 			return service.CommunityListResult{
-				Communities: communities,
-				Limit:       limit,
-				Offset:      offset,
-				Total:       2,
+				Communities: []*model.Community{
+					{
+						ID:   1,
+						Name: "Toronto Men",
+						Slug: "toronto-men",
+					},
+					nil,
+					{
+						ID:   2,
+						Name: "Mississauga Men",
+						Slug: "mississauga-men",
+					},
+				},
+				Limit:  limit,
+				Offset: offset,
+				Total:  2,
 			}, nil
 		},
 	}

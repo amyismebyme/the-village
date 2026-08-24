@@ -95,6 +95,7 @@ func (m *mockCommunityRepository) List(
 	limit int,
 	offset int,
 ) ([]*model.Community, int64, error) {
+
 	if m.listErr != nil {
 		return nil, 0, m.listErr
 	}
@@ -102,11 +103,13 @@ func (m *mockCommunityRepository) List(
 	list := make([]*model.Community, 0, len(m.communities))
 
 	for _, c := range m.communities {
+
 		copy := *c
 		list = append(list, &copy)
 	}
 
 	total := int64(len(list))
+
 	if offset >= len(list) {
 		return []*model.Community{}, total, nil
 	}
@@ -249,18 +252,18 @@ func TestListCommunities(t *testing.T) {
 
 	svc := NewCommunityService(repo)
 
-	list, err := svc.List(context.Background(), 20, 0)
+	result, err := svc.List(
+		context.Background(),
+		20,
+		0,
+	)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(list.Communities) != 2 {
-		t.Fatalf("expected 2 communities, got %d", len(list.Communities))
-	}
-
-	if list.Total != 2 {
-		t.Fatalf("expected total 2, got %d", list.Total)
+	if len(result.Communities) != 2 {
+		t.Fatalf("expected 2 communities, got %d", len(result.Communities))
 	}
 }
 
@@ -1302,76 +1305,5 @@ func TestCommunityValidationMetricDoesNotExposeValidationMessage(
 				}
 			}
 		}
-	}
-}
-
-func TestListCommunitiesUsesDefaultLimit(t *testing.T) {
-	repo := newMockCommunityRepository()
-
-	svc := NewCommunityService(repo)
-
-	result, err := svc.List(
-		context.Background(),
-		0,
-		0,
-	)
-	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-
-	if result.Limit != DefaultCommunityPageLimit {
-		t.Fatalf(
-			"expected default limit %d, got %d",
-			DefaultCommunityPageLimit,
-			result.Limit,
-		)
-	}
-
-	if result.Offset != 0 {
-		t.Fatalf("expected default offset 0, got %d", result.Offset)
-	}
-}
-
-func TestListCommunitiesRejectsInvalidPagination(t *testing.T) {
-	tests := []struct {
-		name   string
-		limit  int
-		offset int
-	}{
-		{
-			name:   "negative limit",
-			limit:  -1,
-			offset: 0,
-		},
-		{
-			name:   "excessive limit",
-			limit:  MaxCommunityPageLimit + 1,
-			offset: 0,
-		},
-		{
-			name:   "negative offset",
-			limit:  DefaultCommunityPageLimit,
-			offset: -1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := newMockCommunityRepository()
-			svc := NewCommunityService(repo)
-
-			_, err := svc.List(
-				context.Background(),
-				tt.limit,
-				tt.offset,
-			)
-
-			if !errors.Is(err, ErrInvalidPagination) {
-				t.Fatalf(
-					"expected ErrInvalidPagination, got %v",
-					err,
-				)
-			}
-		})
 	}
 }

@@ -92,33 +92,3 @@ DELETE /communities/{id}
 ```
 
 Do not implement UI against these routes until the schema and request/response contract are aligned and documented in OpenAPI.
-
-
-## Community list pagination
-
-`GET /api/v1/communities` supports offset pagination:
-
-```text
-?limit=20&offset=0
-```
-
-Rules:
-- `limit` defaults to `20`.
-- `limit` must be greater than `0` and cannot exceed `100`.
-- `offset` defaults to `0` and cannot be negative.
-- invalid or excessive pagination parameters return `400`.
-- results are ordered deterministically by `name, id`.
-- an empty page returns `"communities": []` with pagination metadata.
-
-Response shape:
-
-```json
-{
-  "communities": [],
-  "pagination": {
-    "limit": 20,
-    "offset": 0,
-    "total": 123
-  }
-}
-```

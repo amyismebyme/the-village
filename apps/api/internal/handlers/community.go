@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -121,14 +122,26 @@ func (h *Handler) ListCommunities(
 	limit := service.DefaultCommunityPageLimit
 	offset := 0
 
-	if raw := r.URL.Query().Get("limit"); raw != "" {
+	query := r.URL.Query()
+
+	if raw := query.Get("limit"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed <= 0 {
+		if err != nil {
 			writeError(
 				w,
 				http.StatusBadRequest,
 				"invalid_pagination",
-				"limit must be a positive integer",
+				"invalid limit",
+			)
+			return
+		}
+
+		if parsed < 1 {
+			writeError(
+				w,
+				http.StatusBadRequest,
+				"invalid_pagination",
+				"limit must be greater than 0",
 			)
 			return
 		}
@@ -136,50 +149,62 @@ func (h *Handler) ListCommunities(
 		limit = parsed
 	}
 
-	if raw := r.URL.Query().Get("offset"); raw != "" {
+	if raw := query.Get("offset"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 0 {
+		if err != nil {
 			writeError(
 				w,
 				http.StatusBadRequest,
 				"invalid_pagination",
-				"offset must be a non-negative integer",
+				"invalid offset",
 			)
 			return
 		}
 
+		if parsed < 0 {
+			writeError(
+				w,
+				http.StatusBadRequest,
+				"invalid_pagination",
+				"offset must be greater than or equal to 0",
+			)
+			return
+		}
 		offset = parsed
 	}
 
-	page, err := h.communityService.List(
+	result, err := h.communityService.List(
 		r.Context(),
 		limit,
 		offset,
 	)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidPagination) {
+			writeError(
+				w,
+				http.StatusBadRequest,
+				"invalid_pagination",
+				"invalid pagination parameters",
+			)
+			return
+		}
+
 		writeServiceError(w, err)
 		return
 	}
 
-	response := struct {
-		Communities []communityResponse `json:"communities"`
-		Pagination  struct {
-			Limit  int   `json:"limit"`
-			Offset int   `json:"offset"`
-			Total  int64 `json:"total"`
-		} `json:"pagination"`
-	}{
-		Communities: newCommunityResponses(page.Communities),
+	response := communityListResponse{
+		Communities: newCommunityResponses(result.Communities),
+		Pagination: paginationResponse{
+			Limit:  result.Limit,
+			Offset: result.Offset,
+			Total:  result.Total,
+		},
 	}
 
-	response.Pagination.Limit = page.Limit
-	response.Pagination.Offset = page.Offset
-	response.Pagination.Total = page.Total
-
-	httpStatus := http.StatusOK
 	httputil.WriteJSON(
 		w,
-		httpStatus,
+		http.StatusOK,
 		response,
 	)
 }

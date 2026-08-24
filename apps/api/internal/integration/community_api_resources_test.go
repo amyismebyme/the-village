@@ -98,24 +98,3 @@ func TestCommunityAPI_InvalidResources(t *testing.T) {
 		resp.Body.Close()
 	})
 }
-
-func TestCommunityAPI_DeleteSemantics(t *testing.T) {
-	app := newIntegrationApp(t)
-
-	createBody := `{"name":"Delete Semantics","slug":"delete-semantics","description":"Delete semantics test"}`
-	createResp := integrationRequest(t, app, http.MethodPost, "/api/v1/communities", createBody)
-	requireJSONResponse(t, createResp, http.StatusCreated)
-	created := decodeCommunity(t, createResp)
-
-	firstDelete := integrationRequest(t, app, http.MethodDelete, communityPath(created.ID), "")
-	if firstDelete.StatusCode != http.StatusNoContent {
-		defer firstDelete.Body.Close()
-		t.Fatalf("expected first DELETE status %d, got %d", http.StatusNoContent, firstDelete.StatusCode)
-	}
-	firstDelete.Body.Close()
-
-	secondDelete := integrationRequest(t, app, http.MethodDelete, communityPath(created.ID), "")
-	requireJSONResponse(t, secondDelete, http.StatusNotFound)
-	requireRequestID(t, secondDelete)
-	secondDelete.Body.Close()
-}

@@ -47,13 +47,15 @@ type integrationCommunityResponse struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+type integrationCommunityPagination struct {
+	Limit  int   `json:"limit"`
+	Offset int   `json:"offset"`
+	Total  int64 `json:"total"`
+}
+
 type integrationCommunityListResponse struct {
 	Communities []integrationCommunityResponse `json:"communities"`
-	Pagination  struct {
-		Limit  int   `json:"limit"`
-		Offset int   `json:"offset"`
-		Total  int64 `json:"total"`
-	} `json:"pagination"`
+	Pagination  integrationCommunityPagination `json:"pagination"`
 }
 
 var integrationEnvOnce sync.Once

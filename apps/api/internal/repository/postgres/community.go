@@ -33,22 +33,29 @@ func (r *CommunityRepository) List(
 	limit int,
 	offset int,
 ) (communities []*model.Community, total int64, err error) {
-
 	start := time.Now()
 
 	defer func() {
 		observeQuery("list", start, err)
 	}()
 
+	if limit < 1 {
+		return nil, 0, errors.New("limit must be greater than zero")
+	}
+
+	if offset < 0 {
+		return nil, 0, errors.New("offset must not be negative")
+	}
+
 	ctx, cancel := r.withQueryTimeout(ctx)
 	defer cancel()
 
-	const countQuery = `
-SELECT COUNT(*)
-FROM communities;
-`
+	const countQuery = `SELECT COUNT(*) FROM communities;`
 
-	if err = r.Pool().QueryRow(ctx, countQuery).Scan(&total); err != nil {
+	if err := r.Pool().QueryRow(
+		ctx,
+		countQuery,
+	).Scan(&total); err != nil {
 		return nil, 0, translateError(err)
 	}
 
@@ -63,8 +70,7 @@ SELECT
     updated_at
 FROM communities
 ORDER BY name, id
-LIMIT $1
-OFFSET $2;
+LIMIT $1 OFFSET $2;
 `
 
 	rows, err := r.Pool().Query(

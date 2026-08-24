@@ -2,32 +2,37 @@ package config
 
 import (
 	"fmt"
-	"strings"
+	"os"
 )
 
 // Validates params at application startup time and exits if not matching
 func Validate(cfg Config) error {
+	if cfg.Environment == "production" {
+		required := []string{
+			"DB_HOST",
+			"DB_USER",
+			"DB_PASSWORD",
+			"DB_NAME",
+			"DB_SSLMODE",
+		}
 
-	if cfg.Port == "" {
-		return fmt.Errorf("PORT cannot be empty")
+		for _, key := range required {
+			if os.Getenv(key) == "" {
+				return fmt.Errorf("%s must be explicitly configured in production", key)
+			}
+		}
 	}
 
-	switch strings.ToLower(cfg.Environment) {
-	case "development", "staging", "production":
-	default:
-		return fmt.Errorf("invalid environment: %s", cfg.Environment)
+	if cfg.Database.QueryTimeout >= cfg.RequestTimeout {
+		return fmt.Errorf(
+			"database query timeout must be less than request timeout",
+		)
 	}
 
-	switch strings.ToLower(cfg.LogLevel) {
-	case "debug", "info", "warn", "error":
-	default:
-		return fmt.Errorf("invalid log level: %s", cfg.LogLevel)
-	}
-
-	switch strings.ToLower(cfg.LogFormat) {
-	case "text", "json":
-	default:
-		return fmt.Errorf("invalid log format: %s", cfg.LogFormat)
+	if cfg.RequestTimeout >= cfg.WriteTimeout {
+		return fmt.Errorf(
+			"request timeout must be less than write timeout",
+		)
 	}
 
 	return nil
