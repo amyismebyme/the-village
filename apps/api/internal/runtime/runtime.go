@@ -6,14 +6,24 @@ import (
 )
 
 var StartedAt = time.Now()
+
+// These variables may be overridden at build time with -ldflags -X.
 var BuildVersion = "0.1.2"
-
-// To pull from git later
 var GitCommit = "local"
-
-// to pull from os later hardcoded for now
-var BuildTime = time.Now().Add(-10 * time.Second)
+var BuildTimestamp = ""
 var Environment = "dev"
+
+var BuildTime = buildTime()
+
+func buildTime() time.Time {
+	if BuildTimestamp != "" {
+		if value, err := time.Parse(time.RFC3339, BuildTimestamp); err == nil {
+			return value
+		}
+	}
+
+	return StartedAt
+}
 
 func Uptime() time.Duration {
 	return time.Since(StartedAt)

@@ -18,6 +18,15 @@ type createCommunityRequest struct {
 	ExternalSource string `json:"external_source"`
 }
 
+// updateCommunityRequest intentionally mirrors the fields accepted by PUT
+// while keeping create/update contracts distinct at the handler boundary.
+type updateCommunityRequest struct {
+	Name           string `json:"name"`
+	Slug           string `json:"slug"`
+	Description    string `json:"description"`
+	ExternalSource string `json:"external_source"`
+}
+
 // CreateCommunity handles:
 //
 //	POST /api/v1/communities
@@ -39,21 +48,6 @@ func (h *Handler) CreateCommunity(
 			start,
 		)
 	}()
-
-	if r.Method != http.MethodPost {
-		status = http.StatusMethodNotAllowed
-
-		w.Header().Set("Allow", http.MethodPost)
-
-		writeError(
-			w,
-			http.StatusMethodNotAllowed,
-			"method_not_allowed",
-			"method not allowed",
-		)
-
-		return
-	}
 
 	var request createCommunityRequest
 
@@ -106,18 +100,6 @@ func (h *Handler) ListCommunities(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-
-		writeError(
-			w,
-			http.StatusMethodNotAllowed,
-			"method_not_allowed",
-			"method not allowed",
-		)
-
-		return
-	}
 
 	limit := service.DefaultCommunityPageLimit
 	offset := 0
@@ -170,6 +152,7 @@ func (h *Handler) ListCommunities(
 			)
 			return
 		}
+
 		offset = parsed
 	}
 
@@ -216,18 +199,6 @@ func (h *Handler) GetCommunity(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-
-		writeError(
-			w,
-			http.StatusMethodNotAllowed,
-			"method_not_allowed",
-			"method not allowed",
-		)
-
-		return
-	}
 
 	id, err := strconv.ParseInt(
 		r.PathValue("id"),
@@ -294,21 +265,6 @@ func (h *Handler) UpdateCommunity(
 		)
 	}()
 
-	if r.Method != http.MethodPut {
-		status = http.StatusMethodNotAllowed
-
-		w.Header().Set("Allow", http.MethodPut)
-
-		writeError(
-			w,
-			http.StatusMethodNotAllowed,
-			"method_not_allowed",
-			"method not allowed",
-		)
-
-		return
-	}
-
 	id, err := strconv.ParseInt(
 		r.PathValue("id"),
 		10,
@@ -329,7 +285,7 @@ func (h *Handler) UpdateCommunity(
 
 	communityID = id
 
-	var request createCommunityRequest
+	var request updateCommunityRequest
 
 	if err := decodeJSON(
 		w,
@@ -394,21 +350,6 @@ func (h *Handler) DeleteCommunity(
 			start,
 		)
 	}()
-
-	if r.Method != http.MethodDelete {
-		status = http.StatusMethodNotAllowed
-
-		w.Header().Set("Allow", http.MethodDelete)
-
-		writeError(
-			w,
-			http.StatusMethodNotAllowed,
-			"method_not_allowed",
-			"method not allowed",
-		)
-
-		return
-	}
 
 	id, err := strconv.ParseInt(
 		r.PathValue("id"),

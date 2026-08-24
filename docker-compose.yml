@@ -64,6 +64,13 @@ services:
       PORT: "8080"
       ENVIRONMENT: development
       LOG_LEVEL: info
+      LOG_FORMAT: json
+      READ_TIMEOUT: "10"
+      REQUEST_TIMEOUT: "35"
+      WRITE_TIMEOUT: "40"
+      IDLE_TIMEOUT: "60"
+      SHUTDOWN_TIMEOUT: "15"
+      DB_QUERY_TIMEOUT: "30"
 
       DB_HOST: postgres
       DB_PORT: "5432"

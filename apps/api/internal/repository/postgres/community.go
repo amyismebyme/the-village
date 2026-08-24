@@ -39,14 +39,6 @@ func (r *CommunityRepository) List(
 		observeQuery("list", start, err)
 	}()
 
-	if limit < 1 {
-		return nil, 0, errors.New("limit must be greater than zero")
-	}
-
-	if offset < 0 {
-		return nil, 0, errors.New("offset must not be negative")
-	}
-
 	ctx, cancel := r.withQueryTimeout(ctx)
 	defer cancel()
 
@@ -141,10 +133,6 @@ func (r *CommunityRepository) Create(
 		observeQuery("create", start, err)
 	}()
 
-	if community == nil {
-		return errors.New("community is nil")
-	}
-
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -204,10 +192,6 @@ func (r *CommunityRepository) Update(
 	defer func() {
 		observeQuery("update", start, err)
 	}()
-
-	if community == nil {
-		return errors.New("community is nil")
-	}
 
 	if community.ID <= 0 {
 		return errors.New("community ID must be greater than zero")

@@ -23,6 +23,7 @@ func NewHTTPServer(
 			appLogger,
 			healthRegistry,
 			handler,
+			cfg.RequestTimeout,
 		),
 
 		ReadTimeout:  cfg.ReadTimeout,

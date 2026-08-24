@@ -3,7 +3,6 @@ package metrics
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
@@ -25,26 +24,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		// ServeMux populates Request.Pattern after route matching.
-		//
-		// With method-aware ServeMux patterns, Pattern can be:
-		// "GET /api/v1/communities/{id}".
-		// Metrics use the path pattern only.
-		route := r.Pattern
-
-		if route != "" {
-			if i := strings.IndexByte(route, ' '); i >= 0 {
-				route = route[i+1:]
-			}
-		}
-
-		// If there is no ServeMux route pattern, use the request path.
-		if route == "" {
-			route = r.URL.Path
-		}
-
-		// Keep the normalized pattern available to callers/tests.
-		r.Pattern = route
+		route := httputil.RouteLabel(r)
 
 		RequestsTotal.
 			WithLabelValues(
@@ -60,5 +40,14 @@ func Middleware(next http.Handler) http.Handler {
 				route,
 			).
 			Observe(duration.Seconds())
+
+		if rec.Status >= http.StatusBadRequest {
+			errorType := "client"
+			if rec.Status >= http.StatusInternalServerError {
+				errorType = "server"
+			}
+
+			ErrorsTotal.WithLabelValues(errorType).Inc()
+		}
 	})
 }

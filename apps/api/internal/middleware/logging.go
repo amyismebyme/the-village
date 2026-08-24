@@ -27,7 +27,7 @@ func Logging(
 			"http request completed",
 			"request_id", GetRequestID(r.Context()),
 			"method", r.Method,
-			"route", routeLabel(r),
+			"route", httputil.RouteLabel(r),
 			"status", rec.Status,
 			"duration_ms", duration.Milliseconds(),
 		)
