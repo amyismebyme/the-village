@@ -38,7 +38,7 @@ func TestProductionConfigurationAcceptsExplicitDatabaseSettings(t *testing.T) {
 func TestTimeoutPolicyRelationships(t *testing.T) {
 	cfg := Load()
 	if cfg.Database.QueryTimeout >= cfg.RequestTimeout ||
-        cfg.RequestTimeout >= cfg.WriteTimeout {
+		cfg.RequestTimeout >= cfg.WriteTimeout {
 		t.Fatalf("expected DB query < request < write timeout, got %v < %v < %v", cfg.Database.QueryTimeout, cfg.RequestTimeout, cfg.WriteTimeout)
 	}
 }

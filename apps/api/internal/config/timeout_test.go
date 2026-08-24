@@ -29,7 +29,7 @@ func TestDefaultTimeoutPolicy(t *testing.T) {
 	}
 
 	if cfg.Database.QueryTimeout >= cfg.RequestTimeout ||
-        cfg.RequestTimeout >= cfg.WriteTimeout {
+		cfg.RequestTimeout >= cfg.WriteTimeout {
 		t.Fatalf("expected DB query < request < write timeout")
 	}
 }
