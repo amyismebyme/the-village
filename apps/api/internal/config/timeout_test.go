@@ -28,8 +28,8 @@ func TestDefaultTimeoutPolicy(t *testing.T) {
 		t.Fatalf("expected shutdown timeout 15s, got %v", cfg.ShutdownTimeout)
 	}
 
-	if !(cfg.Database.QueryTimeout < cfg.RequestTimeout &&
-		cfg.RequestTimeout < cfg.WriteTimeout) {
+	if cfg.Database.QueryTimeout >= cfg.RequestTimeout ||
+		cfg.RequestTimeout >= cfg.WriteTimeout {
 		t.Fatalf("expected DB query < request < write timeout")
 	}
 }
