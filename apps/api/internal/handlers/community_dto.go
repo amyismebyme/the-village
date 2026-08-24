@@ -52,3 +52,14 @@ func newCommunityResponses(
 
 	return responses
 }
+
+type paginationResponse struct {
+	Limit  int   `json:"limit"`
+	Offset int   `json:"offset"`
+	Total  int64 `json:"total"`
+}
+
+type communityListResponse struct {
+	Communities []communityResponse `json:"communities"`
+	Pagination  paginationResponse  `json:"pagination"`
+}

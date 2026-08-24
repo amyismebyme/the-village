@@ -149,11 +149,7 @@ func (s *communityService) List(
 		limit = DefaultCommunityPageLimit
 	}
 
-	if limit < 0 || limit > MaxCommunityPageLimit {
-		return CommunityListResult{}, ErrInvalidPagination
-	}
-
-	if offset < 0 {
+	if limit < 1 || limit > MaxCommunityPageLimit || offset < 0 {
 		return CommunityListResult{}, ErrInvalidPagination
 	}
 
