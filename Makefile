@@ -3,6 +3,7 @@ SHELL := /bin/sh
 API_DIR := apps/api
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/village-api
+VERSION ?= 0.1.2
 
 GO := go
 DOCKER := docker
@@ -29,6 +30,7 @@ TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 .PHONY: docker-down
 .PHONY: docker-logs
 .PHONY: clean
+.PHONY: build-release
 
 .DEFAULT_GOAL := help
 
@@ -38,6 +40,7 @@ help:
 	@echo ""
 	@echo "  make run               Run the API locally"
 	@echo "  make build             Build the API binary"
+	@echo "  make build-release     Build with release ldflags"
 	@echo "  make test              Run unit/package tests"
 	@echo "  make test-integration  Run PostgreSQL integration tests"
 	@echo "  make test-race         Run tests with Go race detector"
@@ -59,6 +62,14 @@ run:
 build:
 	mkdir -p $(BIN_DIR)
 	cd $(API_DIR) && $(GO) build -o ../../$(BINARY) ./cmd/api
+
+build-release:
+	mkdir -p $(BIN_DIR)
+	GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo local); \
+	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+	cd $(API_DIR) && $(GO) build \
+		-ldflags="-s -w -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$GIT_COMMIT -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production" \
+		-o ../../$(BINARY) ./cmd/api
 
 test:
 	cd $(API_DIR) && $(GO) test ./...
@@ -101,7 +112,11 @@ lint:
 	cd $(API_DIR) && golangci-lint run
 
 docker-build:
-	$(DOCKER) build --pull -t village-api:local .
+	if [ -f zscaler.crt ]; then \
+		$(DOCKER) build --pull --secret id=zscaler,src=zscaler.crt -t village-api:local .; \
+	else \
+		$(DOCKER) build --pull -t village-api:local .; \
+	fi
 
 docker-up:
 	$(COMPOSE) up --build

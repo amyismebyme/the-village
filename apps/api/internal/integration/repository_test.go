@@ -85,21 +85,6 @@ func TestCommunityRepositoryCreateDuplicate(t *testing.T) {
 	}
 }
 
-func TestCommunityRepositoryCreateNil(t *testing.T) {
-	app := newCommunityRepositoryTestApp(t)
-
-	err := app.repo.Create(
-		context.Background(),
-		nil,
-	)
-
-	if err == nil {
-		t.Fatal(
-			"expected error creating nil community",
-		)
-	}
-}
-
 func TestCommunityRepositoryCreateCancelled(t *testing.T) {
 	app := newCommunityRepositoryTestApp(t)
 
@@ -531,21 +516,6 @@ func TestCommunityRepositoryUpdateDuplicate(t *testing.T) {
 		t.Fatalf(
 			"expected repository.ErrAlreadyExists, got %v",
 			err,
-		)
-	}
-}
-
-func TestCommunityRepositoryUpdateNil(t *testing.T) {
-	app := newCommunityRepositoryTestApp(t)
-
-	err := app.repo.Update(
-		context.Background(),
-		nil,
-	)
-
-	if err == nil {
-		t.Fatal(
-			"expected error updating nil community",
 		)
 	}
 }

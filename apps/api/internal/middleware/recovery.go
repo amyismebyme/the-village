@@ -3,12 +3,15 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 )
 
 func Recovery(appLogger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
+				metrics.PanicsTotal.Inc()
 				requestID := w.Header().Get("X-Request-ID")
 
 				if requestID == "" {

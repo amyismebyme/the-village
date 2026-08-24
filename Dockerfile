@@ -1,52 +1,46 @@
 # syntax=docker/dockerfile:1
 
-# -----------------------------------------------------------------------------
-# Build stage
-# -----------------------------------------------------------------------------
-
 FROM golang:1.26.5-alpine AS builder
 
 WORKDIR /src
 
-# Install certificates needed for HTTPS during dependency downloads.
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates git
 
-# Copy dependency manifests first so Docker can cache dependency downloads.
 COPY apps/api/go.mod apps/api/go.sum ./apps/api/
-
 WORKDIR /src/apps/api
 
+# Optional corporate CA. Provide with: --secret id=zscaler,src=zscaler.crt
+RUN --mount=type=secret,id=zscaler,dst=/tmp/zscaler.crt \
+    if [ -f /tmp/zscaler.crt ]; then \
+        cp /tmp/zscaler.crt /usr/local/share/ca-certificates/zscaler.crt && \
+        update-ca-certificates; \
+    fi
 
-COPY zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
-RUN update-ca-certificates
 RUN go mod download
 
-# Copy the API source.
 WORKDIR /src
 COPY apps/api ./apps/api
 
 WORKDIR /src/apps/api
 
-# Build a static Linux binary.
+ARG VERSION=0.1.2
+ARG GIT_COMMIT=local
+ARG BUILD_TIME=
+ARG ENVIRONMENT=production
+
 RUN CGO_ENABLED=0 \
     GOOS=linux \
     GOARCH=amd64 \
     go build \
     -trimpath \
-    -ldflags="-s -w" \
+    -ldflags="-s -w -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=${VERSION} -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=${GIT_COMMIT} -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=${BUILD_TIME} -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=${ENVIRONMENT}" \
     -o /out/village-api \
     ./cmd/api
-
-
-# -----------------------------------------------------------------------------
-# Runtime stage
-# -----------------------------------------------------------------------------
 
 FROM alpine:3.22 AS runtime
 
 WORKDIR /app
 
-# Install CA certificates for outbound HTTPS requests.
 RUN apk add --no-cache ca-certificates \
     && addgroup -S village \
     && adduser -S village -G village

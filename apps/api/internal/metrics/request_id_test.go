@@ -1,4 +1,4 @@
-package metrics
+package metrics_test
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -14,7 +15,7 @@ func TestHTTPMetricsDoNotUseRequestIDLabel(t *testing.T) {
 	const requestID = "metrics-request-id-test"
 
 	handler := middleware.RequestID(
-		Middleware(
+		metrics.Middleware(
 			http.HandlerFunc(func(
 				w http.ResponseWriter,
 				r *http.Request,
@@ -41,7 +42,7 @@ func TestHTTPMetricsDoNotUseRequestIDLabel(t *testing.T) {
 
 	registry := prometheus.NewRegistry()
 
-	if err := registry.Register(RequestsTotal); err != nil {
+	if err := registry.Register(metrics.RequestsTotal); err != nil {
 		t.Fatalf(
 			"register RequestsTotal: %v",
 			err,
@@ -49,7 +50,6 @@ func TestHTTPMetricsDoNotUseRequestIDLabel(t *testing.T) {
 	}
 
 	families, err := registry.Gather()
-
 	if err != nil {
 		t.Fatalf(
 			"gather metrics: %v",
