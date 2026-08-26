@@ -1,0 +1,59 @@
+package testutil
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestServerCapturesRequests(t *testing.T) {
+	server := NewServer(
+		Response{
+			StatusCode: http.StatusTooManyRequests,
+			Body:       `{"error":"rate limited"}`,
+		},
+	)
+	defer server.Close()
+
+	response, err := http.Get(
+		server.URL() + "/rate-limit",
+	)
+	if err != nil {
+		t.Fatalf(
+			"request test server: %v",
+			err,
+		)
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusTooManyRequests,
+			response.StatusCode,
+		)
+	}
+
+	count, method, path, _ := server.Snapshot()
+
+	if count != 1 {
+		t.Fatalf(
+			"expected request count 1, got %d",
+			count,
+		)
+	}
+
+	if method != http.MethodGet {
+		t.Fatalf(
+			"expected GET, got %s",
+			method,
+		)
+	}
+
+	if path != "/rate-limit" {
+		t.Fatalf(
+			"expected /rate-limit, got %s",
+			path,
+		)
+	}
+}

@@ -35,5 +35,11 @@ func Validate(cfg Config) error {
 		)
 	}
 
+	if cfg.External.RequestTimeout <= 0 {
+		return fmt.Errorf(
+			"external request timeout must be greater than zero",
+		)
+	}
+
 	return nil
 }
