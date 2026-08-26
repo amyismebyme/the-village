@@ -92,15 +92,20 @@ func ReadAndClose(
 		return nil, ErrNilResponseBody
 	}
 
-	defer body.Close()
+	data, readErr := io.ReadAll(body)
+	closeErr := body.Close()
 
-	data, err := io.ReadAll(body)
-	if err != nil {
-		return nil, err
+	if readErr != nil {
+		return nil, readErr
+	}
+
+	if closeErr != nil {
+		return nil, closeErr
 	}
 
 	return data, nil
 }
+
 
 func classifyStatus(status int) error {
 	switch {
