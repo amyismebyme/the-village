@@ -144,7 +144,7 @@ func TestObserveOperationTimeout(t *testing.T) {
 func TestExternalTestServer(t *testing.T) {
 	server := testutil.NewServer(
 		testutil.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       `{"ok":true}`,
 			Headers: map[string]string{
 				"Content-Type": "application/json",
@@ -181,7 +181,14 @@ func TestExternalTestServer(t *testing.T) {
 		)
 	}
 
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Errorf(
+				"close response body: %v",
+				err,
+			)
+		}
+	}()
 
 	count, method, path, headers := server.Snapshot()
 

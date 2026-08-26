@@ -24,7 +24,14 @@ func TestServerCapturesRequests(t *testing.T) {
 		)
 	}
 
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Errorf(
+				"close response body: %v",
+				err,
+			)
+		}
+	}()
 
 	if response.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf(
