@@ -106,7 +106,6 @@ func ReadAndClose(
 	return data, nil
 }
 
-
 func classifyStatus(status int) error {
 	switch {
 	case status >= 200 && status < 300:
