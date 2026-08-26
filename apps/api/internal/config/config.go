@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type ExternalConfig struct {
+	RequestTimeout time.Duration
+}
+
 // Config holds all application configuration.
 type Config struct {
 	Port            string
@@ -21,6 +25,7 @@ type Config struct {
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
 	Database        database.Config
+	External        ExternalConfig
 }
 
 // Load reads environment variables.
@@ -36,6 +41,12 @@ func Load() Config {
 		WriteTimeout:    getDuration("WRITE_TIMEOUT", 40),
 		IdleTimeout:     getDuration("IDLE_TIMEOUT", 60),
 		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 15),
+		External: ExternalConfig{
+			RequestTimeout: getDuration(
+				"EXTERNAL_REQUEST_TIMEOUT",
+				15,
+			),
+		},
 
 		Database: database.Config{
 			Host: getEnv("DB_HOST", "localhost"),

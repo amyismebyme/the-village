@@ -2,25 +2,40 @@ package metrics
 
 import (
 	"errors"
+	"runtime"
+
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
-	"runtime"
 )
 
 var RequestsTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "village_http_requests_total",
-		Help: "Total HTTP requests..",
+		Help: "Total HTTP requests.",
 	},
 	[]string{"method", "route", "status"},
 )
 
 var RequestDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Name:    "village_http_request_duration_seconds",
-		Help:    "HTTP request latency.",
-		Buckets: []float64{0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		Name: "village_http_request_duration_seconds",
+		Help: "HTTP request latency.",
+		Buckets: []float64{
+			0.001,
+			0.0025,
+			0.005,
+			0.01,
+			0.025,
+			0.05,
+			0.1,
+			0.25,
+			0.5,
+			1,
+			2.5,
+			5,
+			10,
+		},
 	},
 	[]string{"method", "route"},
 )
@@ -123,14 +138,20 @@ func Register(
 		RequestsInFlight,
 		PanicsTotal,
 		ErrorsTotal,
+
 		DatabaseQueriesTotal,
 		DatabaseQueryDuration,
+
 		BuildInfo,
 
 		CommunityCreateTotal,
 		CommunityUpdateTotal,
 		CommunityDeleteTotal,
 		CommunityValidationFailuresTotal,
+
+		ExternalRequestsTotal,
+		ExternalRequestDuration,
+		ExternalErrorsTotal,
 	}
 
 	if pool != nil {

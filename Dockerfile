@@ -10,11 +10,8 @@ COPY apps/api/go.mod apps/api/go.sum ./apps/api/
 WORKDIR /src/apps/api
 
 # Optional corporate CA. Provide with: --secret id=zscaler,src=zscaler.crt
-RUN --mount=type=secret,id=zscaler,dst=/tmp/zscaler.crt \
-    if [ -f /tmp/zscaler.crt ]; then \
-        cp /tmp/zscaler.crt /usr/local/share/ca-certificates/zscaler.crt && \
-        update-ca-certificates; \
-    fi
+COPY zscaler.crt /usr/local/share/ca-certificates/zscaler.crt
+RUN update-ca-certificates
 
 RUN go mod download
 
