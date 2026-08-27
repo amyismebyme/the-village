@@ -197,7 +197,12 @@ func TestDoAuthenticatedSetsBearerToken(t *testing.T) {
 		)
 	}
 
-	defer response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf(
+			"close response body: %v",
+			err,
+		)
+	}
 
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf(
