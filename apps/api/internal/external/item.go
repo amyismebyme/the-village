@@ -1,6 +1,8 @@
 package external
 
-import "context"
+import (
+	"context"
+)
 
 type Item struct {
 	Source      Source

@@ -37,4 +37,4 @@ Observability
 
 ## Status
 
-🚧 Ready for building UI components
+🚧 Building external integrations

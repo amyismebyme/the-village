@@ -1,0 +1,60 @@
+# Sprint 12 — Reddit Ingestion Verification
+
+## Scope
+
+Sprint 12 establishes Reddit as the first concrete external integration.
+
+## Verified pipeline
+
+Reddit test server
+→ Reddit authentication
+→ Reddit API client
+→ Reddit DTO
+→ normalization
+→ external.Item
+→ external.Identity
+→ ingestion service
+→ observability
+
+## Test policy
+
+Automated tests must not depend on the live Reddit service.
+
+Reddit API behavior is simulated through the local external integration
+test server.
+
+## Security
+
+The verification suite confirms that:
+
+- Reddit client secrets are not logged.
+- Access tokens are not logged.
+- Authorization headers are not exposed in logs.
+- Provider payloads are not exposed as Prometheus labels.
+- External IDs are not Prometheus labels.
+
+## Error contract
+
+The following mappings are verified:
+
+- 401 → ErrUnauthorized
+- 403 → ErrForbidden
+- 404 → ErrNotFound
+- 429 → ErrRateLimited
+- 5xx → ErrUpstream
+- timeout → ErrTimeout
+- malformed JSON → ErrInvalidPayload
+- cancellation → context.Canceled
+
+## Verification commands
+
+From `apps/api`:
+
+```powershell
+go test ./internal/external/... -v -count=1
+go test ./internal/external/reddit/... -v -count=1
+go test ./... -count=1
+go test -race ./...
+go vet ./...
+golangci-lint run
+go test -tags=integration ./internal/integration/... -v -count=1

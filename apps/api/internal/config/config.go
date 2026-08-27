@@ -11,6 +11,7 @@ import (
 
 type ExternalConfig struct {
 	RequestTimeout time.Duration
+	Reddit         RedditConfig
 }
 
 // Config holds all application configuration.
@@ -26,6 +27,14 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	Database        database.Config
 	External        ExternalConfig
+}
+
+type RedditConfig struct {
+	Enabled      bool
+	ClientID     string
+	ClientSecret string
+	UserAgent    string
+	BaseURL      string
 }
 
 // Load reads environment variables.
@@ -46,6 +55,29 @@ func Load() Config {
 				"EXTERNAL_REQUEST_TIMEOUT",
 				15,
 			),
+
+			Reddit: RedditConfig{
+				Enabled: getBool(
+					"REDDIT_ENABLED",
+					false,
+				),
+				ClientID: getEnv(
+					"REDDIT_CLIENT_ID",
+					"",
+				),
+				ClientSecret: getEnv(
+					"REDDIT_CLIENT_SECRET",
+					"",
+				),
+				UserAgent: getEnv(
+					"REDDIT_USER_AGENT",
+					"",
+				),
+				BaseURL: getEnv(
+					"REDDIT_BASE_URL",
+					"https://www.reddit.com",
+				),
+			},
 		},
 
 		Database: database.Config{
@@ -113,4 +145,22 @@ func getInt(key string, defaultValue int) int {
 	}
 
 	return v
+}
+
+func getBool(
+	key string,
+	defaultValue bool,
+) bool {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+
+	return parsed
 }

@@ -51,3 +51,27 @@ func TestTimeoutPolicyRejectsDatabaseTimeoutAtOrAboveRequestTimeout(t *testing.T
 		t.Fatal("expected invalid timeout relationship to fail validation")
 	}
 }
+
+func TestProductionRedditConfigurationRequiresCredentials(
+	t *testing.T,
+) {
+	t.Setenv("ENVIRONMENT", "production")
+	t.Setenv("DB_HOST", "db")
+	t.Setenv("DB_USER", "village")
+	t.Setenv("DB_PASSWORD", "secret")
+	t.Setenv("DB_NAME", "village")
+	t.Setenv("DB_SSLMODE", "require")
+
+	t.Setenv("REDDIT_ENABLED", "true")
+	t.Setenv("REDDIT_CLIENT_ID", "")
+	t.Setenv("REDDIT_CLIENT_SECRET", "")
+	t.Setenv("REDDIT_USER_AGENT", "")
+
+	cfg := Load()
+
+	if err := Validate(cfg); err == nil {
+		t.Fatal(
+			"expected production Reddit configuration validation error",
+		)
+	}
+}

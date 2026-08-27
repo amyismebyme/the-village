@@ -64,3 +64,66 @@ func TestServerCapturesRequests(t *testing.T) {
 		)
 	}
 }
+
+func TestNewRouteServer(t *testing.T) {
+	server := NewRouteServer(
+		map[string]Response{
+			"/token": {
+				StatusCode: http.StatusOK,
+				Body:       `{"access_token":"test"}`,
+			},
+			"/items": {
+				StatusCode: http.StatusOK,
+				Body:       `{"items":[]}`,
+			},
+		},
+		Response{
+			StatusCode: http.StatusNotFound,
+		},
+	)
+	defer server.Close()
+
+	for _, path := range []string{
+		"/token",
+		"/items",
+	} {
+		response, err := http.Get(
+			server.URL() + path,
+		)
+		if err != nil {
+			t.Fatalf(
+				"GET %s: %v",
+				path,
+				err,
+			)
+		}
+
+		response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf(
+				"GET %s: expected 200, got %d",
+				path,
+				response.StatusCode,
+			)
+		}
+	}
+
+	response, err := http.Get(
+		server.URL() + "/unknown",
+	)
+	if err != nil {
+		t.Fatalf(
+			"GET /unknown: %v",
+			err,
+		)
+	}
+	response.Body.Close()
+
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf(
+			"expected 404 for unknown route, got %d",
+			response.StatusCode,
+		)
+	}
+}
