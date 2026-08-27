@@ -136,3 +136,45 @@ func TestNormalizerProducesProviderNeutralItem(
 
 	}
 }
+
+func TestItemValidateRejectsMissingSource(t *testing.T) {
+	item := Item{
+		ExternalID: "123",
+	}
+
+	if err := item.Validate(); err == nil {
+		t.Fatal(
+			"expected missing source error",
+		)
+	}
+}
+
+func TestItemValidateRejectsMissingExternalID(
+	t *testing.T,
+) {
+	item := Item{
+		Source: Source("test"),
+	}
+
+	if err := item.Validate(); err == nil {
+		t.Fatal(
+			"expected missing external ID error",
+		)
+	}
+}
+
+func TestItemValidateAcceptsValidIdentity(
+	t *testing.T,
+) {
+	item := Item{
+		Source:     Source("test"),
+		ExternalID: "123",
+	}
+
+	if err := item.Validate(); err != nil {
+		t.Fatalf(
+			"unexpected validation error: %v",
+			err,
+		)
+	}
+}

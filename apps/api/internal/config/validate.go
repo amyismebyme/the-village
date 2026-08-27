@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 )
 
@@ -38,6 +39,64 @@ func Validate(cfg Config) error {
 	if cfg.External.RequestTimeout <= 0 {
 		return fmt.Errorf(
 			"external request timeout must be greater than zero",
+		)
+	}
+
+	if err := validateReddit(cfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateReddit(
+	cfg Config,
+) error {
+	if !cfg.External.Reddit.Enabled {
+		return nil
+	}
+
+	if cfg.External.Reddit.ClientID == "" {
+		return fmt.Errorf(
+			"REDDIT_CLIENT_ID must be configured when Reddit is enabled",
+		)
+	}
+
+	if cfg.External.Reddit.ClientSecret == "" {
+		return fmt.Errorf(
+			"REDDIT_CLIENT_SECRET must be configured when Reddit is enabled",
+		)
+	}
+
+	if cfg.External.Reddit.UserAgent == "" {
+		return fmt.Errorf(
+			"REDDIT_USER_AGENT must be configured when Reddit is enabled",
+		)
+	}
+
+	if cfg.External.Reddit.BaseURL == "" {
+		return fmt.Errorf(
+			"REDDIT_BASE_URL must be configured when Reddit is enabled",
+		)
+	}
+
+	u, err := url.Parse(cfg.External.Reddit.BaseURL)
+	if err != nil {
+		return fmt.Errorf(
+			"REDDIT_BASE_URL is invalid: %w",
+			err,
+		)
+	}
+
+	if u.Scheme != "https" {
+		return fmt.Errorf(
+			"REDDIT_BASE_URL must use https",
+		)
+	}
+
+	if u.Host == "" {
+		return fmt.Errorf(
+			"REDDIT_BASE_URL must include a host",
 		)
 	}
 

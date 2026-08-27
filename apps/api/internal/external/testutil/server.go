@@ -17,6 +17,7 @@ type Server struct {
 	mu sync.Mutex
 
 	Response Response
+	Routes   map[string]Response
 
 	RequestCount int
 	LastMethod   string
@@ -29,6 +30,27 @@ type Server struct {
 func NewServer(response Response) *Server {
 	s := &Server{
 		Response: response,
+		Routes:   make(map[string]Response),
+	}
+
+	s.Server = httptest.NewServer(
+		http.HandlerFunc(s.handle),
+	)
+
+	return s
+}
+
+func NewRouteServer(
+	routes map[string]Response,
+	defaultResponse Response,
+) *Server {
+	s := &Server{
+		Response: defaultResponse,
+		Routes:   make(map[string]Response, len(routes)),
+	}
+
+	for path, response := range routes {
+		s.Routes[path] = response
 	}
 
 	s.Server = httptest.NewServer(
@@ -50,6 +72,10 @@ func (s *Server) handle(
 	s.LastHeaders = r.Header.Clone()
 
 	response := s.Response
+
+	if routeResponse, ok := s.Routes[r.URL.Path]; ok {
+		response = routeResponse
+	}
 
 	s.mu.Unlock()
 
@@ -83,5 +109,4 @@ func (s *Server) Snapshot() (
 	defer s.mu.Unlock()
 
 	return s.RequestCount, s.LastMethod, s.LastPath, s.LastHeaders.Clone()
-
 }
