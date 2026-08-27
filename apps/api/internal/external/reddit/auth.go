@@ -223,8 +223,9 @@ func (a *Authenticator) fetchToken(
 		response.StatusCode,
 	)
 
-	defer response.Body.Close()
-
+	defer func() {
+		_ = response.Body.Close()
+	}()
 	var token tokenResponse
 
 	if err := json.NewDecoder(

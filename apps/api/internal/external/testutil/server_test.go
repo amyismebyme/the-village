@@ -98,7 +98,12 @@ func TestNewRouteServer(t *testing.T) {
 			)
 		}
 
-		response.Body.Close()
+		if err := response.Body.Close(); err != nil {
+			t.Fatalf(
+				"close response body: %v",
+				err,
+			)
+		}
 
 		if response.StatusCode != http.StatusOK {
 			t.Fatalf(
@@ -118,7 +123,12 @@ func TestNewRouteServer(t *testing.T) {
 			err,
 		)
 	}
-	response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf(
+			"close response body: %v",
+			err,
+		)
+	}
 
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf(
