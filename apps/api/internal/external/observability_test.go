@@ -48,6 +48,7 @@ func TestObserveOperationSuccess(t *testing.T) {
 		"fetch",
 		"external-123",
 		"200",
+		true,
 		start,
 		nil,
 	)
@@ -106,6 +107,7 @@ func TestObserveOperationTimeout(t *testing.T) {
 		"fetch",
 		"external-timeout",
 		"timeout",
+		true,
 		time.Now(),
 		err,
 	)
@@ -233,7 +235,7 @@ func registerExternalCollectors(
 	for _, collector := range collectors {
 		if err := registry.Register(collector); err != nil {
 			t.Fatalf(
-				"register external metric: %v",
+				"register external collector: %v",
 				err,
 			)
 		}
@@ -265,4 +267,148 @@ func assertMetricFamily(
 		"metric family %q not found",
 		name,
 	)
+}
+
+func TestObserveOperationDoesNotCountUnattemptedRequest(
+	t *testing.T,
+) {
+	registry := prometheus.NewRegistry()
+
+	registerExternalCollectors(
+		t,
+		registry,
+	)
+
+	metrics.ExternalRequestsTotal.Reset()
+
+	ObserveOperation(
+		nil,
+		Source("test"),
+		"fetch",
+		"",
+		"invalid_config",
+		false,
+		time.Now(),
+		ErrInvalidConfig,
+	)
+
+	families, err := registry.Gather()
+	if err != nil {
+		t.Fatalf(
+			"gather metrics: %v",
+			err,
+		)
+	}
+
+	for _, family := range families {
+		if family.GetName() !=
+			"village_external_requests_total" {
+			continue
+		}
+
+		if len(family.GetMetric()) != 0 {
+			t.Fatal(
+				"unattempted operation should not expose request metric",
+			)
+		}
+	}
+}
+
+func TestObserveOperationRecordsRateLimitError(
+	t *testing.T,
+) {
+	metrics.ExternalRequestsTotal.Reset()
+	metrics.ExternalRequestDuration.Reset()
+	metrics.ExternalErrorsTotal.Reset()
+
+	registry := prometheus.NewRegistry()
+
+	registerExternalCollectors(
+		t,
+		registry,
+	)
+
+	start := time.Now()
+
+	ObserveOperation(
+		nil,
+		Source("reddit"),
+		"fetch",
+		"",
+		"429",
+		true,
+		start,
+		ErrRateLimited,
+	)
+
+	families, err := registry.Gather()
+	if err != nil {
+		t.Fatalf(
+			"gather metrics: %v",
+			err,
+		)
+	}
+
+	var found bool
+
+	for _, family := range families {
+		if family.GetName() !=
+			"village_external_errors_total" {
+			continue
+		}
+
+		found = true
+
+		if len(family.GetMetric()) != 1 {
+			t.Fatalf(
+				"expected 1 error metric sample, got %d",
+				len(family.GetMetric()),
+			)
+		}
+
+		metric := family.GetMetric()[0]
+
+		if metric.GetCounter().GetValue() != 1 {
+			t.Fatalf(
+				"expected error counter 1, got %v",
+				metric.GetCounter().GetValue(),
+			)
+		}
+
+		labels := make(
+			map[string]string,
+		)
+
+		for _, label := range metric.GetLabel() {
+			labels[label.GetName()] =
+				label.GetValue()
+		}
+
+		if labels["source"] != "reddit" {
+			t.Fatalf(
+				"expected source=reddit, got %q",
+				labels["source"],
+			)
+		}
+
+		if labels["operation"] != "fetch" {
+			t.Fatalf(
+				"expected operation=fetch, got %q",
+				labels["operation"],
+			)
+		}
+
+		if labels["type"] != "rate_limited" {
+			t.Fatalf(
+				"expected type=rate_limited, got %q",
+				labels["type"],
+			)
+		}
+	}
+
+	if !found {
+		t.Fatal(
+			"metric family village_external_errors_total not found",
+		)
+	}
 }

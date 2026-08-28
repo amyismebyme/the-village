@@ -1,10 +1,11 @@
 package external
 
 import (
+	"context"
+	"errors"
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"log/slog"
 	"time"
-
-	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 )
 
 // ObserveOperation records the bounded Prometheus metrics and the
@@ -19,36 +20,39 @@ func ObserveOperation(
 	operation string,
 	externalID string,
 	status string,
+	requestAttempted bool,
 	start time.Time,
 	err error,
 ) {
 	duration := time.Since(start)
 
-	metrics.ExternalRequestsTotal.
-		WithLabelValues(
-			string(source),
-			operation,
-			status,
-		).
-		Inc()
-
-	metrics.ExternalRequestDuration.
-		WithLabelValues(
-			string(source),
-			operation,
-		).
-		Observe(duration.Seconds())
-
-	if err != nil {
-		errorType := classifyErrorType(err)
-
-		metrics.ExternalErrorsTotal.
+	if requestAttempted {
+		metrics.ExternalRequestsTotal.
 			WithLabelValues(
 				string(source),
 				operation,
-				errorType,
+				status,
 			).
 			Inc()
+
+		metrics.ExternalRequestDuration.
+			WithLabelValues(
+				string(source),
+				operation,
+			).
+			Observe(
+				duration.Seconds(),
+			)
+
+		if err != nil {
+			metrics.ExternalErrorsTotal.
+				WithLabelValues(
+					string(source),
+					operation,
+					classifyErrorType(err),
+				).
+				Inc()
+		}
 	}
 
 	if logger == nil {
@@ -90,35 +94,32 @@ func ObserveOperation(
 
 func classifyErrorType(err error) string {
 	switch {
-	case IsRetryable(err):
-		switch {
-		case IsRateLimited(err):
-			return "rate_limited"
+	case errors.Is(err, ErrUnauthorized):
+		return "unauthorized"
 
-		case IsTimeout(err):
-			return "timeout"
+	case errors.Is(err, ErrForbidden):
+		return "forbidden"
 
-		default:
-			return "upstream"
-		}
+	case errors.Is(err, ErrNotFound):
+		return "not_found"
 
-	case IsPermanent(err):
-		switch {
-		case IsUnauthorized(err):
-			return "unauthorized"
+	case errors.Is(err, ErrRateLimited):
+		return "rate_limited"
 
-		case IsForbidden(err):
-			return "forbidden"
+	case errors.Is(err, ErrTimeout):
+		return "timeout"
 
-		case IsInvalidPayload(err):
-			return "invalid_payload"
+	case errors.Is(err, ErrInvalidPayload):
+		return "invalid_payload"
 
-		case IsInvalidConfig(err):
-			return "invalid_config"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
 
-		default:
-			return "permanent"
-		}
+	case errors.Is(err, ErrUpstream):
+		return "upstream"
+
+	case errors.Is(err, ErrInvalidConfig):
+		return "invalid_config"
 
 	default:
 		return "unknown"

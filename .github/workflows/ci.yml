@@ -31,6 +31,25 @@ jobs:
           cache: true
           cache-dependency-path: apps/api/go.sum
 
+      - name: Verify build metadata injection
+        shell: bash
+        env:
+          EXPECTED_BUILD_VERSION: ${{ github.sha }}
+          EXPECTED_GIT_COMMIT: ${{ github.sha }}
+          EXPECTED_ENVIRONMENT: production
+        run: |
+          BUILD_TIME="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          EXPECTED_BUILD_TIMESTAMP="$BUILD_TIME" \
+          go test ./internal/runtime \
+            -run '^TestInjectedBuildMetadata$' \
+            -count=1 \
+            -ldflags "\
+              -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=${EXPECTED_BUILD_VERSION} \
+              -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=${EXPECTED_GIT_COMMIT} \
+              -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=${BUILD_TIME} \
+              -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=${EXPECTED_ENVIRONMENT}"   
+
       - name: Verify dependencies
         run: go mod verify
 

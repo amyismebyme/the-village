@@ -15,7 +15,6 @@ type Lifecycle struct {
 	running bool
 	cancel  context.CancelFunc
 	done    chan struct{}
-	runErr  error
 }
 
 func NewLifecycle(worker Worker) *Lifecycle {
@@ -63,7 +62,6 @@ func (l *Lifecycle) Run(
 	l.running = true
 	l.cancel = cancel
 	l.done = make(chan struct{})
-	l.runErr = nil
 
 	done := l.done
 
@@ -77,7 +75,6 @@ func (l *Lifecycle) Run(
 
 	l.running = false
 	l.cancel = nil
-	l.runErr = err
 
 	close(done)
 

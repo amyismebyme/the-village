@@ -38,8 +38,9 @@ func TestRedditObservabilityRecordsRequest(
 	observeOperation(
 		nil,
 		"fetch",
-		"reddit-test-id",
+		"",
 		"200",
+		true,
 		time.Now(),
 		nil,
 	)
@@ -83,8 +84,9 @@ func TestRedditObservabilityRecordsRateLimitError(
 	observeOperation(
 		nil,
 		"fetch",
-		"reddit-test-id",
-		"429",
+		"",
+		"200",
+		true,
 		time.Now(),
 		external.ErrRateLimited,
 	)
@@ -208,6 +210,7 @@ func TestRedditObservabilityLogDoesNotContainSensitiveData(
 		"authenticate",
 		"",
 		"200",
+		true,
 		time.Now(),
 		nil,
 	)

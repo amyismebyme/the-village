@@ -74,10 +74,15 @@ func Run() error {
 		"idle_connections", stats.IdleConnections,
 	)
 
-	metrics.Register(
+	if err := metrics.Register(
 		prometheus.DefaultRegisterer,
 		db.Pool(),
-	)
+	); err != nil {
+		return fmt.Errorf(
+			"register metrics: %w",
+			err,
+		)
+	}
 
 	//------------------------------------------------------------------
 	// Dependency Injection
