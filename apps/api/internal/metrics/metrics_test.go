@@ -1,9 +1,10 @@
 package metrics
 
 import (
-	"testing"
-
+	"errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"strings"
+	"testing"
 )
 
 func TestBuildInfoMetric(t *testing.T) {
@@ -444,8 +445,15 @@ func TestCommunityValidationMetricUsesBoundedFieldLabel(t *testing.T) {
 func TestMetricsRegistration(t *testing.T) {
 	registry := prometheus.NewRegistry()
 
-	Register(registry, nil)
-
+	if err := Register(
+		registry,
+		nil,
+	); err != nil {
+		t.Fatalf(
+			"register metrics: %v",
+			err,
+		)
+	}
 	families, err := registry.Gather()
 	if err != nil {
 		t.Fatalf("gather metrics: %v", err)
@@ -510,5 +518,54 @@ func TestDatabaseQueriesMetric(t *testing.T) {
 
 	if !found {
 		t.Fatal("village_db_queries_total metric not found")
+	}
+}
+
+type failingRegisterer struct{}
+
+func (failingRegisterer) Register(
+	prometheus.Collector,
+) error {
+	return errors.New(
+		"registration failed",
+	)
+}
+
+func (failingRegisterer) MustRegister(
+	...prometheus.Collector,
+) {
+	panic(
+		"MustRegister should not be called",
+	)
+}
+
+func (failingRegisterer) Unregister(
+	prometheus.Collector,
+) bool {
+	return false
+}
+
+func TestRegisterReturnsUnexpectedRegistrationError(
+	t *testing.T,
+) {
+	err := Register(
+		failingRegisterer{},
+		nil,
+	)
+
+	if err == nil {
+		t.Fatal(
+			"expected registration error",
+		)
+	}
+
+	if !strings.Contains(
+		err.Error(),
+		"register metric",
+	) {
+		t.Fatalf(
+			"expected registration context, got %v",
+			err,
+		)
 	}
 }

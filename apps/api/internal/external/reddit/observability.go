@@ -14,6 +14,7 @@ func observeOperation(
 	operation string,
 	externalID string,
 	status string,
+	requestAttempted bool,
 	start time.Time,
 	err error,
 ) {
@@ -23,6 +24,7 @@ func observeOperation(
 		operation,
 		externalID,
 		status,
+		requestAttempted,
 		start,
 		err,
 	)
@@ -30,31 +32,58 @@ func observeOperation(
 
 func redditStatusFromError(err error) string {
 	switch {
-	case errors.Is(err, external.ErrUnauthorized):
+	case errors.Is(
+		err,
+		external.ErrUnauthorized,
+	):
 		return "401"
 
-	case errors.Is(err, external.ErrForbidden):
+	case errors.Is(
+		err,
+		external.ErrForbidden,
+	):
 		return "403"
 
-	case errors.Is(err, external.ErrNotFound):
+	case errors.Is(
+		err,
+		external.ErrNotFound,
+	):
 		return "404"
 
-	case errors.Is(err, external.ErrRateLimited):
+	case errors.Is(
+		err,
+		external.ErrRateLimited,
+	):
 		return "429"
 
-	case errors.Is(err, external.ErrTimeout):
+	case errors.Is(
+		err,
+		external.ErrTimeout,
+	):
 		return "timeout"
 
-	case errors.Is(err, external.ErrUpstream):
+	case errors.Is(
+		err,
+		external.ErrUpstream,
+	):
 		return "5xx"
 
-	case errors.Is(err, external.ErrInvalidPayload):
+	case errors.Is(
+		err,
+		external.ErrInvalidPayload,
+	):
 		return "invalid_payload"
 
-	case errors.Is(err, external.ErrInvalidConfig):
+	case errors.Is(
+		err,
+		external.ErrInvalidConfig,
+	):
 		return "invalid_config"
 
-	case errors.Is(err, context.Canceled):
+	case errors.Is(
+		err,
+		context.Canceled,
+	):
 		return "canceled"
 
 	default:

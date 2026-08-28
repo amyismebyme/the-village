@@ -31,6 +31,7 @@ TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 .PHONY: docker-logs
 .PHONY: clean
 .PHONY: build-release
+.PHONY: verify-build-metadata
 
 .DEFAULT_GOAL := help
 
@@ -130,3 +131,16 @@ docker-logs:
 clean:
 	cd $(API_DIR) && $(GO) clean
 	rm -rf $(BIN_DIR)
+
+
+verify-build-metadata:
+	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+	cd $(API_DIR) && \
+	EXPECTED_BUILD_VERSION="$(VERSION)" \
+	EXPECTED_GIT_COMMIT="$$(git rev-parse HEAD 2>/dev/null || echo local)" \
+	EXPECTED_BUILD_TIMESTAMP="$$BUILD_TIME" \
+	EXPECTED_ENVIRONMENT="production" \
+	$(GO) test ./internal/runtime \
+		-run '^TestInjectedBuildMetadata$$' \
+		-count=1 \
+		-ldflags="-X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$(git rev-parse HEAD 2>/dev/null || echo local) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production"

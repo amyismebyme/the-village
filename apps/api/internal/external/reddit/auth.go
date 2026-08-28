@@ -152,6 +152,7 @@ func (a *Authenticator) fetchToken(
 ) (result tokenResponse, err error) {
 	start := time.Now()
 	status := "error"
+	requestAttempted := false
 
 	defer func() {
 		observeOperation(
@@ -159,6 +160,7 @@ func (a *Authenticator) fetchToken(
 			"authenticate",
 			"",
 			status,
+			requestAttempted,
 			start,
 			err,
 		)
@@ -205,6 +207,7 @@ func (a *Authenticator) fetchToken(
 		a.clientSecret,
 	)
 
+	requestAttempted = true
 	response, err := a.client.DoChecked(
 		ctx,
 		req,

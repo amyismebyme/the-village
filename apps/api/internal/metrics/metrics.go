@@ -2,11 +2,11 @@ package metrics
 
 import (
 	"errors"
-	"runtime"
-
+	"fmt"
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
+	"runtime"
 )
 
 var RequestsTotal = prometheus.NewCounterVec(
@@ -131,7 +131,13 @@ var BuildInfo = prometheus.NewGaugeVec(
 func Register(
 	reg prometheus.Registerer,
 	pool *pgxpool.Pool,
-) {
+) error {
+	if reg == nil {
+		return errors.New(
+			"metrics: registerer is required",
+		)
+	}
+
 	collectors := []prometheus.Collector{
 		RequestsTotal,
 		RequestDuration,
@@ -170,9 +176,17 @@ func Register(
 		if err := reg.Register(collector); err != nil {
 			var alreadyRegistered prometheus.AlreadyRegisteredError
 
-			if !errors.As(err, &alreadyRegistered) {
-				panic(err)
+			if errors.As(
+				err,
+				&alreadyRegistered,
+			) {
+				continue
 			}
+
+			return fmt.Errorf(
+				"register metric: %w",
+				err,
+			)
 		}
 	}
 
@@ -182,6 +196,8 @@ func Register(
 		runtime.Version(),
 		appruntime.Environment,
 	).Set(1)
+
+	return nil
 }
 
 type PoolCollector struct {

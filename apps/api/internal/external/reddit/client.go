@@ -216,6 +216,7 @@ func (c *Client) FetchListing(
 
 	status := "error"
 	externalID := ""
+	requestAttempted := false
 
 	defer func() {
 		observeOperation(
@@ -223,6 +224,7 @@ func (c *Client) FetchListing(
 			"fetch",
 			externalID,
 			status,
+			requestAttempted,
 			start,
 			err,
 		)
@@ -246,6 +248,7 @@ func (c *Client) FetchListing(
 	}
 
 	query := url.Values{}
+
 	query.Set(
 		"limit",
 		fmt.Sprintf("%d", limit),
@@ -258,19 +261,17 @@ func (c *Client) FetchListing(
 		)
 	}
 
-	path := "/r/" +
-		url.PathEscape(subreddit) +
-		"/new"
-
 	req, err := c.NewRequest(
 		ctx,
 		http.MethodGet,
-		path,
+		"/r/"+url.PathEscape(subreddit)+"/new",
 		query,
 	)
 	if err != nil {
 		return ListingResponse{}, err
 	}
+
+	requestAttempted = true
 
 	response, err := c.DoAuthenticated(
 		ctx,

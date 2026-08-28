@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
-	"strings"
+	"github.com/amyismebyme/the-village/apps/api/internal/validation"
 )
 
 const (
@@ -342,18 +343,13 @@ func validationField(err error) string {
 		return "unknown"
 	}
 
-	message := err.Error()
+	var fieldErr validation.FieldError
 
-	field, _, ok := strings.Cut(
-		message,
-		":",
-	)
-
-	if !ok {
+	if !errors.As(err, &fieldErr) {
 		return "unknown"
 	}
 
-	switch field {
+	switch fieldErr.Field {
 	case "name":
 		return "name"
 

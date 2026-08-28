@@ -1307,3 +1307,41 @@ func TestCommunityValidationMetricDoesNotExposeValidationMessage(
 		}
 	}
 }
+
+func TestFieldErrorPreservesCause(t *testing.T) {
+	err := validation.NewFieldError(
+		"name",
+		validation.ErrTooShort,
+	)
+
+	if !errors.Is(
+		err,
+		validation.ErrTooShort,
+	) {
+		t.Fatal(
+			"expected validation cause to be preserved",
+		)
+	}
+}
+
+func TestFieldErrorExposesField(t *testing.T) {
+	err := validation.NewFieldError(
+		"slug",
+		validation.ErrInvalidSlug,
+	)
+
+	var fieldErr validation.FieldError
+
+	if !errors.As(err, &fieldErr) {
+		t.Fatal(
+			"expected FieldError",
+		)
+	}
+
+	if fieldErr.Field != "slug" {
+		t.Fatalf(
+			"expected field slug, got %q",
+			fieldErr.Field,
+		)
+	}
+}

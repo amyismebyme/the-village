@@ -374,10 +374,15 @@ func newIntegrationAppWithLogger(
 
 	db := OpenTestDatabase(t)
 
-	metrics.Register(
+	if err := metrics.Register(
 		prometheus.DefaultRegisterer,
 		db.Pool(),
-	)
+	); err != nil {
+		t.Fatalf(
+			"register metrics: %v",
+			err,
+		)
+	}
 
 	repo := postgres.NewCommunityRepository(
 		db.Pool(),
