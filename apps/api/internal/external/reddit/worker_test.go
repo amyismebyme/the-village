@@ -142,17 +142,16 @@ func TestIngestionWorkerRunsRedditIngestion(
 	)
 
 	for requests.Load() < 2 {
-    	select {
-    	case <-deadline:
-    		t.Fatalf(
-    			"expected authentication and listing requests, got %d",
-    			requests.Load(),
-    		)
+		select {
+		case <-deadline:
+			t.Fatalf(
+				"expected authentication and listing requests, got %d",
+				requests.Load(),
+			)
 
-    	case <-time.After(5 * time.Millisecond):
-    	}
-    }
-
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
 
 	cancel()
 
