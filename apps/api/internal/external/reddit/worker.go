@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
-	"time"
-
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/worker"
+	"log/slog"
+	"time"
 )
 
 const workerName = "reddit_ingestion"
@@ -134,6 +133,11 @@ func (w *IngestionWorker) runOnce(
 	status := "success"
 
 	if err != nil {
+		if errors.Is(err, context.Canceled) &&
+			errors.Is(ctx.Err(), context.Canceled) {
+			return err
+		}
+
 		status = "failure"
 
 		metrics.WorkerFailuresTotal.

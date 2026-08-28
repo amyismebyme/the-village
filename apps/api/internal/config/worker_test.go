@@ -13,10 +13,6 @@ func TestWorkerConfigurationDefaults(
 		"",
 	)
 	t.Setenv(
-		"WORKER_SHUTDOWN_TIMEOUT",
-		"",
-	)
-	t.Setenv(
 		"REDDIT_INGEST_SUBREDDIT",
 		"",
 	)
@@ -34,14 +30,6 @@ func TestWorkerConfigurationDefaults(
 	if cfg.Worker.Enabled {
 		t.Fatal(
 			"expected workers to be disabled by default",
-		)
-	}
-
-	if cfg.Worker.ShutdownTimeout !=
-		10*time.Second {
-		t.Fatalf(
-			"expected worker shutdown timeout 10s, got %s",
-			cfg.Worker.ShutdownTimeout,
 		)
 	}
 
@@ -77,10 +65,6 @@ func TestWorkerConfigurationIsConfigurable(
 		"true",
 	)
 	t.Setenv(
-		"WORKER_SHUTDOWN_TIMEOUT",
-		"20",
-	)
-	t.Setenv(
 		"REDDIT_INGEST_SUBREDDIT",
 		"niagara",
 	)
@@ -98,14 +82,6 @@ func TestWorkerConfigurationIsConfigurable(
 	if !cfg.Worker.Enabled {
 		t.Fatal(
 			"expected workers enabled",
-		)
-	}
-
-	if cfg.Worker.ShutdownTimeout !=
-		20*time.Second {
-		t.Fatalf(
-			"unexpected shutdown timeout %s",
-			cfg.Worker.ShutdownTimeout,
 		)
 	}
 

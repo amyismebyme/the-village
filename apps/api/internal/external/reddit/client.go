@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -40,24 +41,14 @@ func NewClient(
 		baseURL = defaultBaseURL
 	}
 
-	parsedURL, err := url.Parse(baseURL)
+	parsedURL, err := httputil.ParseBaseURL(
+		baseURL,
+		true,
+	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"reddit client: parse base URL: %w",
+			"reddit client: %w",
 			err,
-		)
-	}
-
-	if parsedURL.Scheme != "http" &&
-		parsedURL.Scheme != "https" {
-		return nil, errors.New(
-			"reddit client: base URL must use http or https",
-		)
-	}
-
-	if parsedURL.Host == "" {
-		return nil, errors.New(
-			"reddit client: base URL must include host",
 		)
 	}
 
@@ -229,15 +220,6 @@ func (c *Client) FetchListing(
 			err,
 		)
 	}()
-
-	if strings.TrimSpace(subreddit) == "" {
-		err = fmt.Errorf(
-			"%w: subreddit is required",
-			external.ErrInvalidConfig,
-		)
-
-		return ListingResponse{}, err
-	}
 
 	if err := ctx.Err(); err != nil {
 		return ListingResponse{}, err

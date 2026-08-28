@@ -10,9 +10,8 @@ import (
 )
 
 type WorkerConfig struct {
-	Enabled         bool
-	ShutdownTimeout time.Duration
-	Reddit          RedditWorkerConfig
+	Enabled bool
+	Reddit  RedditWorkerConfig
 }
 
 type RedditWorkerConfig struct {
@@ -48,6 +47,7 @@ type RedditConfig struct {
 	ClientSecret string
 	UserAgent    string
 	BaseURL      string
+	AuthBaseURL  string
 }
 
 // Load reads environment variables.
@@ -88,6 +88,10 @@ func Load() Config {
 				),
 				BaseURL: getEnv(
 					"REDDIT_BASE_URL",
+					"https://oauth.reddit.com",
+				),
+				AuthBaseURL: getEnv(
+					"REDDIT_AUTH_BASE_URL",
 					"https://www.reddit.com",
 				),
 			},
@@ -97,11 +101,6 @@ func Load() Config {
 			Enabled: getBool(
 				"WORKER_ENABLED",
 				false,
-			),
-
-			ShutdownTimeout: getDuration(
-				"WORKER_SHUTDOWN_TIMEOUT",
-				10,
 			),
 
 			Reddit: RedditWorkerConfig{
