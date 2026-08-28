@@ -269,7 +269,7 @@ func TestSchedulerResilientContinuesAfterFailure(
 	}
 }
 
-func TestSchedulerResilientDoesNotConvertCancellationIntoFailure(
+func TestSchedulerResilientDoesNotCountCancellationAsFailure(
 	t *testing.T,
 ) {
 	scheduler, err := NewScheduler(
@@ -309,9 +309,9 @@ func TestSchedulerResilientDoesNotConvertCancellationIntoFailure(
 		)
 	}
 
-	if failures != 1 {
+	if failures != 0 {
 		t.Fatalf(
-			"expected one observed failure, got %d",
+			"expected zero worker failures during cancellation, got %d",
 			failures,
 		)
 	}

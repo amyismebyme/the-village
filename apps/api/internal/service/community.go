@@ -263,20 +263,14 @@ func (s *communityService) Delete(
 		return ErrInvalidCommunityID
 	}
 
-	if _, err := s.repository.FindByID(ctx, id); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return repository.ErrNotFound
-		}
-
-		return fmt.Errorf(
-			"community service: find community %d: %w",
-			id,
+	if err := s.repository.Delete(
+		ctx,
+		id,
+	); err != nil {
+		if errors.Is(
 			err,
-		)
-	}
-
-	if err := s.repository.Delete(ctx, id); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+			repository.ErrNotFound,
+		) {
 			return repository.ErrNotFound
 		}
 

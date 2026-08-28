@@ -12,6 +12,7 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
+	"github.com/amyismebyme/the-village/apps/api/internal/external/reddit"
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
 	"github.com/amyismebyme/the-village/apps/api/internal/logger"
@@ -20,6 +21,7 @@ import (
 	appruntime "github.com/amyismebyme/the-village/apps/api/internal/runtime"
 	"github.com/amyismebyme/the-village/apps/api/internal/server"
 	"github.com/amyismebyme/the-village/apps/api/internal/service"
+	"github.com/amyismebyme/the-village/apps/api/internal/worker"
 )
 
 func Run() error {
@@ -103,6 +105,89 @@ func Run() error {
 	)
 
 	//------------------------------------------------------------------
+	// Background Workers
+	//------------------------------------------------------------------
+
+	workerRuntime := worker.NewRuntime()
+
+	if cfg.Worker.Enabled {
+		if !cfg.External.Reddit.Enabled {
+			return fmt.Errorf(
+				"worker configuration: Reddit must be enabled when workers are enabled",
+			)
+		}
+
+		redditHTTPClient := &http.Client{}
+
+		redditAuthenticator, err := reddit.NewAuthenticator(
+			redditHTTPClient,
+			cfg.External.Reddit.AuthBaseURL,
+			cfg.External.Reddit.ClientID,
+			cfg.External.Reddit.ClientSecret,
+			cfg.External.Reddit.UserAgent,
+			cfg.External.RequestTimeout,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"create Reddit authenticator: %w",
+				err,
+			)
+		}
+
+		redditClient, err := reddit.NewClient(
+			redditHTTPClient,
+			cfg.External.Reddit.BaseURL,
+			cfg.External.Reddit.UserAgent,
+			cfg.External.RequestTimeout,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"create Reddit client: %w",
+				err,
+			)
+		}
+
+		redditAuthenticator.SetLogger(appLogger)
+		redditClient.SetLogger(appLogger)
+
+		redditIngestion := reddit.NewIngestionService(
+			redditClient,
+			reddit.NewPostNormalizer(),
+		)
+
+		redditWorker, err := reddit.NewIngestionWorker(
+			redditAuthenticator,
+			redditIngestion,
+			reddit.WorkerConfig{
+				Subreddit: cfg.Worker.Reddit.Subreddit,
+				Limit:     cfg.Worker.Reddit.Limit,
+				After:     "",
+				Interval:  cfg.Worker.Reddit.IngestInterval,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"create Reddit worker: %w",
+				err,
+			)
+		}
+
+		redditWorker.SetLogger(appLogger)
+
+		redditLifecycle := worker.NewLifecycle(
+			redditWorker,
+		)
+
+		if err := workerRuntime.Add(
+			redditLifecycle,
+		); err != nil {
+			return fmt.Errorf(
+				"register Reddit worker: %w",
+				err,
+			)
+		}
+	}
+	//------------------------------------------------------------------
 	// HTTP Server
 	//------------------------------------------------------------------
 
@@ -143,6 +228,28 @@ func Run() error {
 		"startup_ms",
 		appruntime.Uptime().Milliseconds(),
 	)
+
+	workerCtx, workerCancel := context.WithCancel(
+		context.Background(),
+	)
+	defer workerCancel()
+
+	if cfg.Worker.Enabled {
+		if err := workerRuntime.Start(
+			workerCtx,
+		); err != nil {
+			db.Close()
+
+			return fmt.Errorf(
+				"start workers: %w",
+				err,
+			)
+		}
+
+		appLogger.Info(
+			"background workers started",
+		)
+	}
 
 	stop := make(chan os.Signal, 1)
 
@@ -187,12 +294,30 @@ func Run() error {
 
 	defer cancel()
 
+	if err := workerRuntime.Stop(shutdownCtx); err != nil {
+		return fmt.Errorf(
+			"shutdown workers: %w",
+			err,
+		)
+	}
+
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 
 		db.Close()
 
 		return fmt.Errorf(
 			"shutdown http server: %w",
+			err,
+		)
+	}
+
+	if err := workerRuntime.Stop(
+		shutdownCtx,
+	); err != nil {
+		db.Close()
+
+		return fmt.Errorf(
+			"shutdown workers: %w",
 			err,
 		)
 	}

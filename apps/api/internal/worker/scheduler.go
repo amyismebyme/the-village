@@ -86,6 +86,11 @@ func (s *Scheduler) run(
 		}
 
 		if err := fn(ctx); err != nil {
+			if errors.Is(err, context.Canceled) &&
+				ctx.Err() != nil {
+				return ctx.Err()
+			}
+
 			if handledErr := handleError(err); handledErr != nil {
 				return fmt.Errorf(
 					"worker scheduler: run: %w",

@@ -2,17 +2,16 @@ package reddit
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/amyismebyme/the-village/apps/api/internal/external"
 )
 
 const (
@@ -86,24 +85,14 @@ func NewAuthenticator(
 		)
 	}
 
-	parsedURL, err := url.Parse(baseURL)
+	parsedURL, err := httputil.ParseBaseURL(
+		baseURL,
+		true,
+	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"reddit authenticator: parse base URL: %w",
+			"reddit client: %w",
 			err,
-		)
-	}
-
-	if parsedURL.Scheme != "http" &&
-		parsedURL.Scheme != "https" {
-		return nil, errors.New(
-			"reddit authenticator: base URL must use http or https",
-		)
-	}
-
-	if parsedURL.Host == "" {
-		return nil, errors.New(
-			"reddit authenticator: base URL must include host",
 		)
 	}
 
@@ -226,14 +215,12 @@ func (a *Authenticator) fetchToken(
 		response.StatusCode,
 	)
 
-	defer func() {
-		_ = response.Body.Close()
-	}()
 	var token tokenResponse
 
-	if err := json.NewDecoder(
-		response.Body,
-	).Decode(&token); err != nil {
+	if err := DecodeJSON(
+		response,
+		&token,
+	); err != nil {
 		return tokenResponse{}, fmt.Errorf(
 			"%w: decode token response",
 			external.ErrInvalidPayload,

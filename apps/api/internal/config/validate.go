@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"net/url"
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"os"
 	"strings"
 )
@@ -79,44 +79,25 @@ func validateReddit(
 		)
 	}
 
-	if cfg.External.Reddit.BaseURL == "" {
-		return fmt.Errorf(
-			"REDDIT_BASE_URL must be configured when Reddit is enabled",
-		)
+	if err := validateHTTPSURL(
+		"REDDIT_BASE_URL",
+		cfg.External.Reddit.BaseURL,
+	); err != nil {
+		return err
 	}
 
-	u, err := url.Parse(cfg.External.Reddit.BaseURL)
-	if err != nil {
-		return fmt.Errorf(
-			"REDDIT_BASE_URL is invalid: %w",
-			err,
-		)
-	}
-
-	if u.Scheme != "https" {
-		return fmt.Errorf(
-			"REDDIT_BASE_URL must use https",
-		)
-	}
-
-	if u.Host == "" {
-		return fmt.Errorf(
-			"REDDIT_BASE_URL must include a host",
-		)
+	if err := validateHTTPSURL(
+		"REDDIT_AUTH_BASE_URL",
+		cfg.External.Reddit.AuthBaseURL,
+	); err != nil {
+		return err
 	}
 
 	return nil
 }
-
 func validateWorker(cfg Config) error {
 	if !cfg.Worker.Enabled {
 		return nil
-	}
-
-	if cfg.Worker.ShutdownTimeout <= 0 {
-		return fmt.Errorf(
-			"WORKER_SHUTDOWN_TIMEOUT must be greater than zero",
-		)
 	}
 
 	if cfg.Worker.Reddit.IngestInterval <= 0 {
@@ -137,6 +118,30 @@ func validateWorker(cfg Config) error {
 	) == "" {
 		return fmt.Errorf(
 			"REDDIT_INGEST_SUBREDDIT must be configured",
+		)
+	}
+
+	return nil
+}
+
+func validateHTTPSURL(
+	name string,
+	value string,
+) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf(
+			"%s must be configured",
+			name,
+		)
+	}
+
+	if _, err := httputil.ParseBaseURL(
+		value,
+		false,
+	); err != nil {
+		return fmt.Errorf(
+			"REDDIT_BASE_URL is invalid: %w",
+			err,
 		)
 	}
 

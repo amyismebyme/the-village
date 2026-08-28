@@ -3,7 +3,6 @@ package reddit
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
 )
@@ -42,10 +41,10 @@ func (s *IngestionService) IngestListing(
 	limit int,
 	after string,
 ) ([]external.Item, error) {
-	if strings.TrimSpace(subreddit) == "" {
+	if err := validateSubreddit(subreddit); err != nil {
 		return nil, fmt.Errorf(
 			"%w: subreddit is required",
-			external.ErrInvalidConfig,
+			err,
 		)
 	}
 

@@ -26,6 +26,10 @@ func TestRedditConfigurationDefaults(t *testing.T) {
 		"REDDIT_BASE_URL",
 		"",
 	)
+	t.Setenv(
+		"REDDIT_AUTH_BASE_URL",
+		"",
+	)
 
 	cfg := Load()
 
@@ -55,10 +59,18 @@ func TestRedditConfigurationDefaults(t *testing.T) {
 	}
 
 	if cfg.External.Reddit.BaseURL !=
-		"https://www.reddit.com" {
+		"https://oauth.reddit.com" {
 		t.Fatalf(
 			"expected default Reddit base URL, got %q",
 			cfg.External.Reddit.BaseURL,
+		)
+	}
+
+	if cfg.External.Reddit.AuthBaseURL !=
+		"https://www.reddit.com" {
+		t.Fatalf(
+			"expected default Reddit auth base URL, got %q",
+			cfg.External.Reddit.AuthBaseURL,
 		)
 	}
 }
