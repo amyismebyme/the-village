@@ -152,6 +152,11 @@ func Register(
 		ExternalRequestsTotal,
 		ExternalRequestDuration,
 		ExternalErrorsTotal,
+
+		WorkerRunsTotal,
+		WorkerFailuresTotal,
+		WorkerDuration,
+		WorkersInFlight,
 	}
 
 	if pool != nil {

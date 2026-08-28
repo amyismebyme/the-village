@@ -9,6 +9,18 @@ import (
 	"time"
 )
 
+type WorkerConfig struct {
+	Enabled         bool
+	ShutdownTimeout time.Duration
+	Reddit          RedditWorkerConfig
+}
+
+type RedditWorkerConfig struct {
+	Subreddit      string
+	Limit          int
+	IngestInterval time.Duration
+}
+
 type ExternalConfig struct {
 	RequestTimeout time.Duration
 	Reddit         RedditConfig
@@ -27,6 +39,7 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	Database        database.Config
 	External        ExternalConfig
+	Worker          WorkerConfig
 }
 
 type RedditConfig struct {
@@ -76,6 +89,35 @@ func Load() Config {
 				BaseURL: getEnv(
 					"REDDIT_BASE_URL",
 					"https://www.reddit.com",
+				),
+			},
+		},
+
+		Worker: WorkerConfig{
+			Enabled: getBool(
+				"WORKER_ENABLED",
+				false,
+			),
+
+			ShutdownTimeout: getDuration(
+				"WORKER_SHUTDOWN_TIMEOUT",
+				10,
+			),
+
+			Reddit: RedditWorkerConfig{
+				Subreddit: getEnv(
+					"REDDIT_INGEST_SUBREDDIT",
+					"toronto",
+				),
+
+				Limit: getInt(
+					"REDDIT_INGEST_LIMIT",
+					25,
+				),
+
+				IngestInterval: getDuration(
+					"REDDIT_INGEST_INTERVAL",
+					300,
 				),
 			},
 		},

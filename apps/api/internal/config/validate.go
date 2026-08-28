@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // Validates params at application startup time and exits if not matching
@@ -43,6 +44,10 @@ func Validate(cfg Config) error {
 	}
 
 	if err := validateReddit(cfg); err != nil {
+		return err
+	}
+
+	if err := validateWorker(cfg); err != nil {
 		return err
 	}
 
@@ -97,6 +102,41 @@ func validateReddit(
 	if u.Host == "" {
 		return fmt.Errorf(
 			"REDDIT_BASE_URL must include a host",
+		)
+	}
+
+	return nil
+}
+
+func validateWorker(cfg Config) error {
+	if !cfg.Worker.Enabled {
+		return nil
+	}
+
+	if cfg.Worker.ShutdownTimeout <= 0 {
+		return fmt.Errorf(
+			"WORKER_SHUTDOWN_TIMEOUT must be greater than zero",
+		)
+	}
+
+	if cfg.Worker.Reddit.IngestInterval <= 0 {
+		return fmt.Errorf(
+			"REDDIT_INGEST_INTERVAL must be greater than zero",
+		)
+	}
+
+	if cfg.Worker.Reddit.Limit < 1 ||
+		cfg.Worker.Reddit.Limit > 100 {
+		return fmt.Errorf(
+			"REDDIT_INGEST_LIMIT must be between 1 and 100",
+		)
+	}
+
+	if strings.TrimSpace(
+		cfg.Worker.Reddit.Subreddit,
+	) == "" {
+		return fmt.Errorf(
+			"REDDIT_INGEST_SUBREDDIT must be configured",
 		)
 	}
 
