@@ -1,0 +1,35 @@
+Application
+                         │
+                         ▼
+                    Worker Lifecycle
+                         │
+                         ▼
+                     Scheduler
+                         │
+                         ▼
+                Reddit Ingestion Worker
+                  ┌──────┴──────┐
+                  ▼             ▼
+            Authenticator   IngestionService
+                  │             │
+                  └──────┬──────┘
+                         ▼
+                   Reddit Client
+                         │
+                   Rate limiting
+                    (Sprint 14)
+                         │
+                       Reddit
+
+And observability becomes:
+
+Worker
+ ├── worker_runs_total
+ ├── worker_failures_total
+ ├── worker_duration_seconds
+ └── worker_in_flight
+
+Reddit Client
+ ├── external_requests_total
+ ├── external_request_duration_seconds
+ └── external_errors_total
