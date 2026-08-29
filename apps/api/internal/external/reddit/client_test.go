@@ -871,3 +871,153 @@ func TestRedditErrorsHaveCorrectRetryClassification(
 		})
 	}
 }
+
+type recordingRateLimiter struct {
+	calls int
+	err   error
+}
+
+func (r *recordingRateLimiter) Wait(
+	context.Context,
+) error {
+	r.calls++
+	return r.err
+}
+
+func TestFetchListingUsesRateLimiter(
+	t *testing.T,
+) {
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(
+				w http.ResponseWriter,
+				r *http.Request,
+			) {
+				w.Header().Set(
+					"Content-Type",
+					"application/json",
+				)
+
+				_, _ = w.Write(
+					[]byte(`{
+						"data":{
+							"after":null,
+							"before":null,
+							"children":[]
+						}
+					}`),
+				)
+			},
+		),
+	)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.Client(),
+		server.URL,
+		"the-village/test",
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf(
+			"create client: %v",
+			err,
+		)
+	}
+
+	limiter := &recordingRateLimiter{}
+
+	client.SetRateLimiter(limiter)
+
+	_, err = client.FetchListing(
+		context.Background(),
+		"test-token",
+		"toronto",
+		10,
+		"",
+	)
+	if err != nil {
+		t.Fatalf(
+			"FetchListing failed: %v",
+			err,
+		)
+	}
+
+	if limiter.calls != 1 {
+		t.Fatalf(
+			"expected limiter to be called once, got %d",
+			limiter.calls,
+		)
+	}
+}
+
+func TestFetchListingRateLimitCancellationPreventsRequest(
+	t *testing.T,
+) {
+	var requests int
+
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(
+				w http.ResponseWriter,
+				r *http.Request,
+			) {
+				requests++
+
+				w.WriteHeader(
+					http.StatusOK,
+				)
+			},
+		),
+	)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.Client(),
+		server.URL,
+		"the-village/test",
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf(
+			"create client: %v",
+			err,
+		)
+	}
+
+	limiter := &recordingRateLimiter{
+		err: context.Canceled,
+	}
+
+	client.SetRateLimiter(limiter)
+
+	ctx, cancel := context.WithCancel(
+		context.Background(),
+	)
+	cancel()
+
+	_, err = client.FetchListing(
+		ctx,
+		"test-token",
+		"toronto",
+		10,
+		"",
+	)
+
+	if !errors.Is(
+		err,
+		context.Canceled,
+	) {
+		t.Fatalf(
+			"expected context.Canceled, got %v",
+			err,
+		)
+	}
+
+	if requests != 0 {
+		t.Fatalf(
+			"expected zero outbound requests, got %d",
+			requests,
+		)
+	}
+}

@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/amyismebyme/the-village/apps/api/internal/external"
-	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 )
 
 const (
@@ -33,6 +34,9 @@ type Authenticator struct {
 	client  *external.Client
 	baseURL *url.URL
 	logger  *slog.Logger
+
+	rateLimiter external.RateLimiter
+	retryPolicy *external.RetryPolicy
 
 	mu    sync.Mutex
 	token tokenResponse
@@ -91,7 +95,7 @@ func NewAuthenticator(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"reddit client: %w",
+			"reddit authenticator: %w",
 			err,
 		)
 	}
@@ -100,10 +104,12 @@ func NewAuthenticator(
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		userAgent:    userAgent,
+
 		client: external.NewClient(
 			httpClient,
 			requestTimeout,
 		),
+
 		baseURL: parsedURL,
 	}, nil
 }
@@ -114,13 +120,29 @@ func (a *Authenticator) SetLogger(
 	a.logger = logger
 }
 
-// Token returns a cached application token when it remains valid.
-// Tokens are kept in memory only.
+func (a *Authenticator) SetRateLimiter(
+	limiter external.RateLimiter,
+) {
+	a.rateLimiter = limiter
+}
+
+func (a *Authenticator) SetRetryPolicy(
+	policy *external.RetryPolicy,
+) {
+	a.retryPolicy = policy
+}
+
+// Token returns a cached application access token when valid.
+// Access tokens and client secrets are never logged.
 func (a *Authenticator) Token(
 	ctx context.Context,
 ) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 
 	if a.token.valid() {
 		return a.token.AccessToken, nil
@@ -136,33 +158,20 @@ func (a *Authenticator) Token(
 	return token.AccessToken, nil
 }
 
-func (a *Authenticator) fetchToken(
+func (a *Authenticator) newTokenRequest(
 	ctx context.Context,
-) (result tokenResponse, err error) {
-	start := time.Now()
-	status := "error"
-	requestAttempted := false
-
-	defer func() {
-		observeOperation(
-			a.logger,
-			"authenticate",
-			"",
-			status,
-			requestAttempted,
-			start,
-			err,
-		)
-	}()
-
+) (*http.Request, error) {
 	requestURL := *a.baseURL
 
-	requestURL.Path = strings.TrimRight(
-		requestURL.Path,
-		"/",
-	) + accessTokenPath
+	requestURL.Path =
+		strings.TrimRight(
+			requestURL.Path,
+			"/",
+		) +
+			accessTokenPath
 
 	form := url.Values{}
+
 	form.Set(
 		"grant_type",
 		grantTypeClientCredentials,
@@ -172,10 +181,12 @@ func (a *Authenticator) fetchToken(
 		ctx,
 		http.MethodPost,
 		requestURL.String(),
-		strings.NewReader(form.Encode()),
+		strings.NewReader(
+			form.Encode(),
+		),
 	)
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"reddit authenticator: create token request: %w",
 			err,
 		)
@@ -196,67 +207,164 @@ func (a *Authenticator) fetchToken(
 		a.clientSecret,
 	)
 
-	requestAttempted = true
-	response, err := a.client.DoChecked(
-		ctx,
-		req,
-	)
-	if err != nil {
-		status = redditStatusFromError(err)
+	return req, nil
+}
 
+func (a *Authenticator) fetchToken(
+	ctx context.Context,
+) (
+	result tokenResponse,
+	err error,
+) {
+	start := time.Now()
+
+	status := "error"
+	requestAttempted := false
+
+	defer func() {
+		observeOperation(
+			a.logger,
+			"authenticate",
+			"",
+			status,
+			requestAttempted,
+			start,
+			err,
+		)
+	}()
+
+	operation := func(
+		operationCtx context.Context,
+	) error {
+		req, requestErr := a.newTokenRequest(
+			operationCtx,
+		)
+		if requestErr != nil {
+			return requestErr
+		}
+
+		if a.rateLimiter != nil {
+			if requestErr := a.rateLimiter.Wait(
+				operationCtx,
+			); requestErr != nil {
+				return requestErr
+			}
+		}
+
+		requestAttempted = true
+
+		response, requestErr := a.client.DoChecked(
+			operationCtx,
+			req,
+		)
+		if requestErr != nil {
+			status = redditStatusFromError(
+				requestErr,
+			)
+
+			return requestErr
+		}
+
+		status = fmt.Sprintf(
+			"%d",
+			response.StatusCode,
+		)
+
+		var token tokenResponse
+
+		if decodeErr := DecodeJSON(
+			response,
+			&token,
+		); decodeErr != nil {
+			status = "invalid_payload"
+
+			return fmt.Errorf(
+				"%w: decode token response",
+				external.ErrInvalidPayload,
+			)
+		}
+
+		if strings.TrimSpace(
+			token.AccessToken,
+		) == "" {
+			status = "invalid_payload"
+
+			return fmt.Errorf(
+				"%w: missing access token",
+				external.ErrInvalidPayload,
+			)
+		}
+
+		if strings.TrimSpace(
+			token.TokenType,
+		) == "" {
+			status = "invalid_payload"
+
+			return fmt.Errorf(
+				"%w: missing token type",
+				external.ErrInvalidPayload,
+			)
+		}
+
+		if token.ExpiresIn <= 0 {
+			status = "invalid_payload"
+
+			return fmt.Errorf(
+				"%w: invalid token expiry",
+				external.ErrInvalidPayload,
+			)
+		}
+
+		token.ExpiresAt = time.Now().Add(
+			time.Duration(
+				token.ExpiresIn,
+			) * time.Second,
+		)
+
+		result = token
+
+		return nil
+	}
+
+	if a.retryPolicy != nil {
+		err = a.retryPolicy.Do(
+			ctx,
+			operation,
+			func(event external.RetryEvent) {
+				observeRetry(
+					a.logger,
+					"authenticate",
+					event,
+				)
+			},
+		)
+
+		if err != nil {
+			return tokenResponse{}, fmt.Errorf(
+				"reddit authenticator: token request: %w",
+				err,
+			)
+		}
+
+		return result, nil
+	}
+
+	err = operation(ctx)
+
+	if err != nil {
 		return tokenResponse{}, fmt.Errorf(
 			"reddit authenticator: token request: %w",
 			err,
 		)
 	}
 
-	status = fmt.Sprintf(
-		"%d",
-		response.StatusCode,
-	)
-
-	var token tokenResponse
-
-	if err := DecodeJSON(
-		response,
-		&token,
-	); err != nil {
-		return tokenResponse{}, fmt.Errorf(
-			"%w: decode token response",
-			external.ErrInvalidPayload,
-		)
-	}
-
-	if strings.TrimSpace(token.AccessToken) == "" {
-		return tokenResponse{}, fmt.Errorf(
-			"%w: missing access token",
-			external.ErrInvalidPayload,
-		)
-	}
-
-	if token.TokenType == "" {
-		return tokenResponse{}, fmt.Errorf(
-			"%w: missing token type",
-			external.ErrInvalidPayload,
-		)
-	}
-
-	if token.ExpiresIn <= 0 {
-		return tokenResponse{}, fmt.Errorf(
-			"%w: invalid token expiry",
-			external.ErrInvalidPayload,
-		)
-	}
-
-	token.ExpiresAt = time.Now().Add(
-		time.Duration(token.ExpiresIn) * time.Second,
-	)
-
-	return token, nil
+	return result, nil
 }
 
 func (t tokenResponse) valid() bool {
-	if strings.TrimSpace(t.AccessToken) == "" {
+	if strings.TrimSpace(
+		t.AccessToken,
+	) == "" {
 		return false
 	}
 
@@ -266,5 +374,7 @@ func (t tokenResponse) valid() bool {
 
 	return time.Now().Add(
 		30 * time.Second,
-	).Before(t.ExpiresAt)
+	).Before(
+		t.ExpiresAt,
+	)
 }

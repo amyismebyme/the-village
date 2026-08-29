@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"time"
+
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/worker"
-	"log/slog"
-	"time"
 )
 
 const workerName = "reddit_ingestion"
@@ -46,12 +47,6 @@ func NewIngestionWorker(
 	if ingestion == nil {
 		return nil, errors.New(
 			"reddit worker: ingestion service is required",
-		)
-	}
-
-	if config.Subreddit == "" {
-		return nil, errors.New(
-			"reddit worker: subreddit is required",
 		)
 	}
 
@@ -97,6 +92,17 @@ func (w *IngestionWorker) Run(
 	)
 }
 
+// RunOnce executes exactly one ingestion cycle.
+//
+// It is intentionally independent of the scheduler so integration tests
+// and future administrative/manual execution can exercise one worker run
+// deterministically.
+func (w *IngestionWorker) RunOnce(
+	ctx context.Context,
+) error {
+	return w.runOnce(ctx)
+}
+
 func (w *IngestionWorker) handleFailure(
 	err error,
 ) {
@@ -133,6 +139,8 @@ func (w *IngestionWorker) runOnce(
 	status := "success"
 
 	if err != nil {
+		// Cancellation caused by worker shutdown is normal termination,
+		// not a failed worker execution.
 		if errors.Is(err, context.Canceled) &&
 			errors.Is(ctx.Err(), context.Canceled) {
 			return err
@@ -164,6 +172,10 @@ func (w *IngestionWorker) runOnce(
 func (w *IngestionWorker) runOnceInternal(
 	ctx context.Context,
 ) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	token, err := w.authenticator.Token(ctx)
 	if err != nil {
 		return fmt.Errorf(

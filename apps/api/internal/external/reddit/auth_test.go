@@ -329,3 +329,129 @@ func TestRedditListingRequestContract(
 		)
 	}
 }
+
+func TestRedditAuthenticationAndClientShareRateLimiter(
+	t *testing.T,
+) {
+	limiter := &recordingRateLimiter{}
+
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(
+				w http.ResponseWriter,
+				r *http.Request,
+			) {
+				switch r.URL.Path {
+				case accessTokenPath:
+					w.Header().Set(
+						"Content-Type",
+						"application/json",
+					)
+
+					_, _ = w.Write(
+						[]byte(`{
+							"access_token": "test-access-token",
+							"token_type": "bearer",
+							"expires_in": 3600,
+							"scope": "*"
+						}`),
+					)
+
+				case "/r/toronto/new":
+					w.Header().Set(
+						"Content-Type",
+						"application/json",
+					)
+
+					_, _ = w.Write(
+						[]byte(`{
+							"data": {
+								"after": null,
+								"before": null,
+								"children": []
+							}
+						}`),
+					)
+
+				default:
+					http.NotFound(
+						w,
+						r,
+					)
+				}
+			},
+		),
+	)
+	defer server.Close()
+
+	authenticator, err := NewAuthenticator(
+		server.Client(),
+		server.URL,
+		"client-id",
+		"client-secret",
+		"the-village/test",
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf(
+			"create authenticator: %v",
+			err,
+		)
+	}
+
+	client, err := NewClient(
+		server.Client(),
+		server.URL,
+		"the-village/test",
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf(
+			"create Reddit client: %v",
+			err,
+		)
+	}
+
+	authenticator.SetRateLimiter(limiter)
+	client.SetRateLimiter(limiter)
+
+	// First operation: OAuth token request.
+	token, err := authenticator.Token(
+		context.Background(),
+	)
+	if err != nil {
+		t.Fatalf(
+			"authenticate: %v",
+			err,
+		)
+	}
+
+	if token != "test-access-token" {
+		t.Fatalf(
+			"unexpected token %q",
+			token,
+		)
+	}
+
+	// Second operation: Reddit listing request.
+	_, err = client.FetchListing(
+		context.Background(),
+		token,
+		"toronto",
+		10,
+		"",
+	)
+	if err != nil {
+		t.Fatalf(
+			"fetch listing: %v",
+			err,
+		)
+	}
+
+	if limiter.calls != 2 {
+		t.Fatalf(
+			"expected limiter to be called twice, got %d",
+			limiter.calls,
+		)
+	}
+}

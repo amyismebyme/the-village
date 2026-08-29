@@ -2,7 +2,9 @@ package reddit
 
 import (
 	"context"
+	"errors"
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"github.com/amyismebyme/the-village/apps/api/internal/external/testutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -336,13 +338,6 @@ func TestNewIngestionWorkerRejectsInvalidConfiguration(
 		config WorkerConfig
 	}{
 		{
-			name: "missing subreddit",
-			config: WorkerConfig{
-				Limit:    10,
-				Interval: time.Minute,
-			},
-		},
-		{
 			name: "invalid limit",
 			config: WorkerConfig{
 				Subreddit: "toronto",
@@ -374,5 +369,59 @@ func TestNewIngestionWorkerRejectsInvalidConfiguration(
 				)
 			}
 		})
+	}
+}
+
+func TestIngestListingRejectsMissingSubreddit(
+	t *testing.T,
+) {
+	server := testutil.NewRouteServer(
+		map[string]testutil.Response{},
+		testutil.Response{
+			StatusCode: http.StatusNotFound,
+		},
+	)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.Server.Client(),
+		server.URL(),
+		"the-village/test",
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf(
+			"create Reddit client: %v",
+			err,
+		)
+	}
+
+	service := NewIngestionService(
+		client,
+		NewPostNormalizer(),
+	)
+
+	_, err = service.IngestListing(
+		context.Background(),
+		"test-token",
+		"",
+		10,
+		"",
+	)
+
+	if err == nil {
+		t.Fatal(
+			"expected missing subreddit error",
+		)
+	}
+
+	if !errors.Is(
+		err,
+		external.ErrInvalidConfig,
+	) {
+		t.Fatalf(
+			"expected ErrInvalidConfig, got %v",
+			err,
+		)
 	}
 }
