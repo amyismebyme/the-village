@@ -12,6 +12,8 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
+	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"github.com/amyismebyme/the-village/apps/api/internal/external/ratelimit"
 	"github.com/amyismebyme/the-village/apps/api/internal/external/reddit"
 	"github.com/amyismebyme/the-village/apps/api/internal/handlers"
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
@@ -25,24 +27,35 @@ import (
 )
 
 func Run() error {
-
 	cfg := config.Load()
 
 	if err := config.Validate(cfg); err != nil {
-		return fmt.Errorf("validate configuration: %w", err)
+		return fmt.Errorf(
+			"validate configuration: %w",
+			err,
+		)
 	}
 
 	if err := cfg.Database.Validate(); err != nil {
-		return fmt.Errorf("database configuration: %w", err)
+		return fmt.Errorf(
+			"database configuration: %w",
+			err,
+		)
 	}
 
 	appLogger := logger.New(cfg)
 
 	startupCtx := context.Background()
 
-	db, err := database.Open(startupCtx, cfg.Database)
+	db, err := database.Open(
+		startupCtx,
+		cfg.Database,
+	)
 	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+		return fmt.Errorf(
+			"open database: %w",
+			err,
+		)
 	}
 
 	startupComplete := false
@@ -71,9 +84,12 @@ func Run() error {
 
 	appLogger.Info(
 		"database connection pool initialized",
-		"max_connections", stats.MaxConnections,
-		"total_connections", stats.TotalConnections,
-		"idle_connections", stats.IdleConnections,
+		"max_connections",
+		stats.MaxConnections,
+		"total_connections",
+		stats.TotalConnections,
+		"idle_connections",
+		stats.IdleConnections,
 	)
 
 	if err := metrics.Register(
@@ -117,6 +133,55 @@ func Run() error {
 			)
 		}
 
+		// -------------------------------------------------------------
+		// External retry policy
+		// -------------------------------------------------------------
+
+		retryBackoff, err := external.NewBackoff(
+			cfg.External.Retry.InitialBackoff,
+			cfg.External.Retry.MaxBackoff,
+			cfg.External.Retry.BackoffMultiplier,
+			cfg.External.Retry.Jitter,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"configure external retry backoff: %w",
+				err,
+			)
+		}
+
+		retryPolicy, err := external.NewRetryPolicy(
+			cfg.External.Retry.MaxAttempts,
+			retryBackoff,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"configure external retry policy: %w",
+				err,
+			)
+		}
+
+		// -------------------------------------------------------------
+		// Per-source rate limiter
+		// -------------------------------------------------------------
+
+		rateLimiters := ratelimit.NewPerSource()
+
+		redditLimiter, err := rateLimiters.Register(
+			external.SourceReddit,
+			cfg.External.Reddit.RequestInterval,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"configure Reddit rate limiter: %w",
+				err,
+			)
+		}
+
+		// -------------------------------------------------------------
+		// Reddit HTTP client
+		// -------------------------------------------------------------
+
 		redditHTTPClient := &http.Client{}
 
 		redditAuthenticator, err := reddit.NewAuthenticator(
@@ -147,8 +212,37 @@ func Run() error {
 			)
 		}
 
-		redditAuthenticator.SetLogger(appLogger)
-		redditClient.SetLogger(appLogger)
+		// -------------------------------------------------------------
+		// Reddit observability + rate limiting + retry
+		// -------------------------------------------------------------
+
+		redditAuthenticator.SetLogger(
+			appLogger,
+		)
+
+		redditAuthenticator.SetRateLimiter(
+			redditLimiter,
+		)
+
+		redditAuthenticator.SetRetryPolicy(
+			retryPolicy,
+		)
+
+		redditClient.SetLogger(
+			appLogger,
+		)
+
+		redditClient.SetRateLimiter(
+			redditLimiter,
+		)
+
+		redditClient.SetRetryPolicy(
+			retryPolicy,
+		)
+
+		// -------------------------------------------------------------
+		// Reddit ingestion
+		// -------------------------------------------------------------
 
 		redditIngestion := reddit.NewIngestionService(
 			redditClient,
@@ -172,7 +266,21 @@ func Run() error {
 			)
 		}
 
-		redditWorker.SetLogger(appLogger)
+		redditWorker.SetLogger(
+			appLogger,
+		)
+
+		redditClient.SetLogger(
+			appLogger,
+		)
+
+		redditClient.SetRateLimiter(
+			redditLimiter,
+		)
+
+		redditClient.SetRetryPolicy(
+			retryPolicy,
+		)
 
 		redditLifecycle := worker.NewLifecycle(
 			redditWorker,
@@ -187,6 +295,7 @@ func Run() error {
 			)
 		}
 	}
+
 	//------------------------------------------------------------------
 	// HTTP Server
 	//------------------------------------------------------------------
@@ -200,22 +309,25 @@ func Run() error {
 
 	appLogger.Info(
 		"Village API starting",
-		"version", appruntime.BuildVersion,
-		"go_version", appruntime.GoVersion(),
-		"environment", cfg.Environment,
-		"port", cfg.Port,
-		"pid", os.Getpid(),
+		"version",
+		appruntime.BuildVersion,
+		"go_version",
+		appruntime.GoVersion(),
+		"environment",
+		cfg.Environment,
+		"port",
+		cfg.Port,
+		"pid",
+		os.Getpid(),
 	)
 
 	serverErrors := make(chan error, 1)
 
 	go func() {
-
 		err := httpServer.ListenAndServe()
 
 		if err != nil &&
 			err != http.ErrServerClosed {
-
 			serverErrors <- err
 			return
 		}
@@ -264,19 +376,19 @@ func Run() error {
 	startupComplete = true
 
 	select {
-
 	case sig := <-stop:
-
 		appLogger.Info(
 			"shutdown signal received",
-			"signal", sig.String(),
-			"uptime", appruntime.Uptime().String(),
+			"signal",
+			sig.String(),
+			"uptime",
+			appruntime.Uptime().String(),
 		)
 
 	case err := <-serverErrors:
-
 		if err != nil {
 			db.Close()
+
 			return fmt.Errorf(
 				"http server failed: %w",
 				err,
@@ -284,33 +396,22 @@ func Run() error {
 		}
 
 		db.Close()
+
 		return nil
 	}
+
+	//------------------------------------------------------------------
+	// Graceful shutdown
+	//------------------------------------------------------------------
 
 	shutdownCtx, cancel := context.WithTimeout(
 		context.Background(),
 		cfg.ShutdownTimeout,
 	)
-
 	defer cancel()
 
-	if err := workerRuntime.Stop(shutdownCtx); err != nil {
-		return fmt.Errorf(
-			"shutdown workers: %w",
-			err,
-		)
-	}
-
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-
-		db.Close()
-
-		return fmt.Errorf(
-			"shutdown http server: %w",
-			err,
-		)
-	}
-
+	// Stop workers first because workers may depend on
+	// application resources such as HTTP clients or the database.
 	if err := workerRuntime.Stop(
 		shutdownCtx,
 	); err != nil {
@@ -318,6 +419,17 @@ func Run() error {
 
 		return fmt.Errorf(
 			"shutdown workers: %w",
+			err,
+		)
+	}
+
+	if err := httpServer.Shutdown(
+		shutdownCtx,
+	); err != nil {
+		db.Close()
+
+		return fmt.Errorf(
+			"shutdown http server: %w",
 			err,
 		)
 	}

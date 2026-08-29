@@ -1,0 +1,9 @@
+•	Worker starts a Reddit operation.
+•	Retry policy decides whether an attempt is allowed.
+•	Rate limiter waits if the provider is being paced.
+•	The HTTP request starts.
+•	A normal 2xx response succeeds.
+•	A 429 response can use Retry-After before retrying.
+•	A 5xx or timeout can use exponential backoff.
+•	Permanent errors such as 401, 403, 404, or invalid input fail without retries.
+•	Cancellation stops the process instead of starting another attempt.

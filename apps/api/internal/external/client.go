@@ -141,13 +141,29 @@ func (c *Client) DoChecked(
 	}
 
 	if err := classifyStatus(response.StatusCode); err != nil {
-		_ = response.Body.Close()
-
-		return nil, fmt.Errorf(
+		statusErr := fmt.Errorf(
 			"%w: status=%d",
 			err,
 			response.StatusCode,
 		)
+
+		if errors.Is(err, ErrRateLimited) {
+			retryAfter := ParseRetryAfter(
+				response.Header.Get("Retry-After"),
+				time.Now(),
+			)
+
+			_ = response.Body.Close()
+
+			return nil, &RateLimitError{
+				Cause:      statusErr,
+				RetryAfter: retryAfter,
+			}
+		}
+
+		_ = response.Body.Close()
+
+		return nil, statusErr
 	}
 
 	return response, nil

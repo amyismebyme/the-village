@@ -159,6 +159,9 @@ func Register(
 		ExternalRequestDuration,
 		ExternalErrorsTotal,
 
+		ExternalRetriesTotal,
+		ExternalRetryDelay,
+
 		WorkerRunsTotal,
 		WorkerFailuresTotal,
 		WorkerDuration,

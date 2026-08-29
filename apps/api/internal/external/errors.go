@@ -1,6 +1,9 @@
 package external
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	ErrNilRequest      = errors.New("external request is required")
@@ -15,6 +18,35 @@ var (
 	ErrInvalidPayload = errors.New("external invalid payload")
 	ErrInvalidConfig  = errors.New("external invalid configuration")
 )
+
+type RateLimitError struct {
+	Cause      error
+	RetryAfter time.Duration
+}
+
+func (e *RateLimitError) Error() string {
+	if e == nil {
+		return ""
+	}
+
+	if e.Cause == nil {
+		return ErrRateLimited.Error()
+	}
+
+	return e.Cause.Error()
+}
+
+func (e *RateLimitError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	if e.Cause == nil {
+		return ErrRateLimited
+	}
+
+	return e.Cause
+}
 
 func IsRetryable(err error) bool {
 	switch {

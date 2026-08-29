@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/amyismebyme/the-village/apps/api/internal/external"
-	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 )
 
 const (
@@ -23,6 +24,9 @@ type Client struct {
 	baseURL   *url.URL
 	userAgent string
 	logger    *slog.Logger
+
+	rateLimiter external.RateLimiter
+	retryPolicy *external.RetryPolicy
 }
 
 func NewClient(
@@ -74,6 +78,18 @@ func (c *Client) SetLogger(
 	c.logger = logger
 }
 
+func (c *Client) SetRateLimiter(
+	limiter external.RateLimiter,
+) {
+	c.rateLimiter = limiter
+}
+
+func (c *Client) SetRetryPolicy(
+	policy *external.RetryPolicy,
+) {
+	c.retryPolicy = policy
+}
+
 func (c *Client) NewRequest(
 	ctx context.Context,
 	method string,
@@ -86,16 +102,24 @@ func (c *Client) NewRequest(
 		)
 	}
 
-	relativePath := strings.TrimPrefix(path, "/")
+	relativePath := strings.TrimPrefix(
+		path,
+		"/",
+	)
 
 	requestURL := *c.baseURL
-	requestURL.Path = strings.TrimRight(
-		requestURL.Path,
-		"/",
-	) + "/" + relativePath
+
+	requestURL.Path =
+		strings.TrimRight(
+			requestURL.Path,
+			"/",
+		) +
+			"/" +
+			relativePath
 
 	if query != nil {
-		requestURL.RawQuery = query.Encode()
+		requestURL.RawQuery =
+			query.Encode()
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -112,7 +136,7 @@ func (c *Client) NewRequest(
 	}
 
 	req.Header.Set(
-		userAgentHeader,
+		"User-Agent",
 		c.userAgent,
 	)
 
@@ -149,7 +173,7 @@ func (c *Client) DoAuthenticated(
 	req = req.Clone(ctx)
 
 	req.Header.Set(
-		authorizationHeader,
+		"Authorization",
 		"Bearer "+accessToken,
 	)
 
@@ -185,7 +209,10 @@ func DecodeJSON[T any](
 		return external.ErrInvalidPayload
 	}
 
-	if err := json.Unmarshal(body, target); err != nil {
+	if err := json.Unmarshal(
+		body,
+		target,
+	); err != nil {
 		return fmt.Errorf(
 			"%w: %v",
 			external.ErrInvalidPayload,
@@ -202,7 +229,10 @@ func (c *Client) FetchListing(
 	subreddit string,
 	limit int,
 	after string,
-) (listing ListingResponse, err error) {
+) (
+	listing ListingResponse,
+	err error,
+) {
 	start := time.Now()
 
 	status := "error"
@@ -243,43 +273,92 @@ func (c *Client) FetchListing(
 		)
 	}
 
-	req, err := c.NewRequest(
-		ctx,
-		http.MethodGet,
-		"/r/"+url.PathEscape(subreddit)+"/new",
-		query,
-	)
-	if err != nil {
-		return ListingResponse{}, err
+	operation := func(
+		operationCtx context.Context,
+	) error {
+		req, requestErr := c.NewRequest(
+			operationCtx,
+			http.MethodGet,
+			"/r/"+url.PathEscape(
+				subreddit,
+			)+"/new",
+			query,
+		)
+		if requestErr != nil {
+			return requestErr
+		}
+
+		if c.rateLimiter != nil {
+			if requestErr := c.rateLimiter.Wait(
+				operationCtx,
+			); requestErr != nil {
+				return requestErr
+			}
+		}
+
+		requestAttempted = true
+
+		response, requestErr := c.DoAuthenticated(
+			operationCtx,
+			req,
+			accessToken,
+		)
+		if requestErr != nil {
+			status = redditStatusFromError(
+				requestErr,
+			)
+
+			return requestErr
+		}
+
+		status = fmt.Sprintf(
+			"%d",
+			response.StatusCode,
+		)
+
+		if requestErr := DecodeJSON(
+			response,
+			&listing,
+		); requestErr != nil {
+			status = "invalid_payload"
+
+			return fmt.Errorf(
+				"reddit fetch listing: decode response: %w",
+				requestErr,
+			)
+		}
+
+		return nil
 	}
 
-	requestAttempted = true
+	if c.retryPolicy != nil {
+		err = c.retryPolicy.Do(
+			ctx,
+			operation,
+			func(event external.RetryEvent) {
+				observeRetry(
+					c.logger,
+					"fetch",
+					event,
+				)
+			},
+		)
 
-	response, err := c.DoAuthenticated(
-		ctx,
-		req,
-		accessToken,
-	)
+		if err != nil {
+			return ListingResponse{}, fmt.Errorf(
+				"reddit fetch listing: %w",
+				err,
+			)
+		}
+
+		return listing, nil
+	}
+
+	err = operation(ctx)
+
 	if err != nil {
-		status = redditStatusFromError(err)
-
 		return ListingResponse{}, fmt.Errorf(
 			"reddit fetch listing: %w",
-			err,
-		)
-	}
-
-	status = fmt.Sprintf(
-		"%d",
-		response.StatusCode,
-	)
-
-	if err := DecodeJSON(
-		response,
-		&listing,
-	); err != nil {
-		return ListingResponse{}, fmt.Errorf(
-			"reddit fetch listing: decode response: %w",
 			err,
 		)
 	}

@@ -2,11 +2,13 @@ package config
 
 // Package config manages application configuration.
 // Manages different params like ports and timeouts and log settings
+
 import (
-	"github.com/amyismebyme/the-village/apps/api/internal/database"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/database"
 )
 
 type WorkerConfig struct {
@@ -22,7 +24,16 @@ type RedditWorkerConfig struct {
 
 type ExternalConfig struct {
 	RequestTimeout time.Duration
+	Retry          RetryConfig
 	Reddit         RedditConfig
+}
+
+type RetryConfig struct {
+	MaxAttempts       int
+	InitialBackoff    time.Duration
+	MaxBackoff        time.Duration
+	BackoffMultiplier float64
+	Jitter            float64
 }
 
 // Config holds all application configuration.
@@ -42,17 +53,17 @@ type Config struct {
 }
 
 type RedditConfig struct {
-	Enabled      bool
-	ClientID     string
-	ClientSecret string
-	UserAgent    string
-	BaseURL      string
-	AuthBaseURL  string
+	Enabled         bool
+	ClientID        string
+	ClientSecret    string
+	UserAgent       string
+	BaseURL         string
+	AuthBaseURL     string
+	RequestInterval time.Duration
 }
 
 // Load reads environment variables.
 func Load() Config {
-
 	cfg := Config{
 		Port:            getEnv("PORT", "8080"),
 		Environment:     getEnv("ENVIRONMENT", "development"),
@@ -63,36 +74,74 @@ func Load() Config {
 		WriteTimeout:    getDuration("WRITE_TIMEOUT", 40),
 		IdleTimeout:     getDuration("IDLE_TIMEOUT", 60),
 		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 15),
+
 		External: ExternalConfig{
 			RequestTimeout: getDuration(
 				"EXTERNAL_REQUEST_TIMEOUT",
 				15,
 			),
 
+			Retry: RetryConfig{
+				MaxAttempts: getInt(
+					"EXTERNAL_RETRY_MAX_ATTEMPTS",
+					3,
+				),
+
+				InitialBackoff: getDuration(
+					"EXTERNAL_RETRY_INITIAL_BACKOFF",
+					1,
+				),
+
+				MaxBackoff: getDuration(
+					"EXTERNAL_RETRY_MAX_BACKOFF",
+					30,
+				),
+
+				BackoffMultiplier: getFloat(
+					"EXTERNAL_RETRY_BACKOFF_MULTIPLIER",
+					2,
+				),
+
+				Jitter: getFloat(
+					"EXTERNAL_RETRY_JITTER",
+					0.20,
+				),
+			},
+
 			Reddit: RedditConfig{
 				Enabled: getBool(
 					"REDDIT_ENABLED",
 					false,
 				),
+
 				ClientID: getEnv(
 					"REDDIT_CLIENT_ID",
 					"",
 				),
+
 				ClientSecret: getEnv(
 					"REDDIT_CLIENT_SECRET",
 					"",
 				),
+
 				UserAgent: getEnv(
 					"REDDIT_USER_AGENT",
 					"",
 				),
+
 				BaseURL: getEnv(
 					"REDDIT_BASE_URL",
 					"https://oauth.reddit.com",
 				),
+
 				AuthBaseURL: getEnv(
 					"REDDIT_AUTH_BASE_URL",
 					"https://www.reddit.com",
+				),
+
+				RequestInterval: getDuration(
+					"REDDIT_REQUEST_INTERVAL",
+					1,
 				),
 			},
 		},
@@ -122,20 +171,65 @@ func Load() Config {
 		},
 
 		Database: database.Config{
-			Host: getEnv("DB_HOST", "localhost"),
-			Port: getInt("DB_PORT", 5432),
+			Host: getEnv(
+				"DB_HOST",
+				"localhost",
+			),
 
-			User:     getEnv("DB_USER", "village"),
-			Password: getEnv("DB_PASSWORD", "village"),
-			Name:     getEnv("DB_NAME", "village"),
+			Port: getInt(
+				"DB_PORT",
+				5432,
+			),
 
-			SSLMode: getEnv("DB_SSLMODE", "disable"),
+			User: getEnv(
+				"DB_USER",
+				"village",
+			),
 
-			MaxConns:          int32(getInt("DB_MAX_CONNS", 10)),
-			MinConns:          int32(getInt("DB_MIN_CONNS", 1)),
-			MaxConnLifetime:   getDuration("DB_MAX_CONN_LIFETIME", 3600),
-			MaxConnIdleTime:   getDuration("DB_MAX_CONN_IDLE_TIME", 300),
-			HealthCheckPeriod: getDuration("DB_HEALTH_CHECK_PERIOD", 60),
+			Password: getEnv(
+				"DB_PASSWORD",
+				"village",
+			),
+
+			Name: getEnv(
+				"DB_NAME",
+				"village",
+			),
+
+			SSLMode: getEnv(
+				"DB_SSLMODE",
+				"disable",
+			),
+
+			MaxConns: int32(
+				getInt(
+					"DB_MAX_CONNS",
+					10,
+				),
+			),
+
+			MinConns: int32(
+				getInt(
+					"DB_MIN_CONNS",
+					1,
+				),
+			),
+
+			MaxConnLifetime: getDuration(
+				"DB_MAX_CONN_LIFETIME",
+				3600,
+			),
+
+			MaxConnIdleTime: getDuration(
+				"DB_MAX_CONN_IDLE_TIME",
+				300,
+			),
+
+			HealthCheckPeriod: getDuration(
+				"DB_HEALTH_CHECK_PERIOD",
+				60,
+			),
+
 			QueryTimeout: getDuration(
 				"DB_QUERY_TIMEOUT",
 				30,
@@ -147,7 +241,6 @@ func Load() Config {
 }
 
 func getEnv(key, defaultValue string) string {
-
 	value := os.Getenv(key)
 
 	if value == "" {
@@ -157,8 +250,10 @@ func getEnv(key, defaultValue string) string {
 	return value
 }
 
-func getDuration(key string, defaultSeconds int) time.Duration {
-
+func getDuration(
+	key string,
+	defaultSeconds int,
+) time.Duration {
 	value := os.Getenv(key)
 
 	if value == "" {
@@ -166,7 +261,6 @@ func getDuration(key string, defaultSeconds int) time.Duration {
 	}
 
 	seconds, err := strconv.Atoi(value)
-
 	if err != nil {
 		return time.Duration(defaultSeconds) * time.Second
 	}
@@ -174,8 +268,12 @@ func getDuration(key string, defaultSeconds int) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-func getInt(key string, defaultValue int) int {
+func getInt(
+	key string,
+	defaultValue int,
+) int {
 	value := os.Getenv(key)
+
 	if value == "" {
 		return defaultValue
 	}
@@ -204,4 +302,26 @@ func getBool(
 	}
 
 	return parsed
+}
+
+func getFloat(
+	key string,
+	defaultValue float64,
+) float64 {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return defaultValue
+	}
+
+	v, err := strconv.ParseFloat(
+		value,
+		64,
+	)
+
+	if err != nil {
+		return defaultValue
+	}
+
+	return v
 }

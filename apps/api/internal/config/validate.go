@@ -51,6 +51,10 @@ func Validate(cfg Config) error {
 		return err
 	}
 
+	if err := validateRetry(cfg); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -91,6 +95,12 @@ func validateReddit(
 		cfg.External.Reddit.AuthBaseURL,
 	); err != nil {
 		return err
+	}
+
+	if cfg.External.Reddit.RequestInterval <= 0 {
+		return fmt.Errorf(
+			"REDDIT_REQUEST_INTERVAL must be greater than zero",
+		)
 	}
 
 	return nil
@@ -142,6 +152,45 @@ func validateHTTPSURL(
 		return fmt.Errorf(
 			"REDDIT_BASE_URL is invalid: %w",
 			err,
+		)
+	}
+
+	return nil
+}
+
+func validateRetry(
+	cfg Config,
+) error {
+	retry := cfg.External.Retry
+
+	if retry.MaxAttempts < 1 {
+		return fmt.Errorf(
+			"EXTERNAL_RETRY_MAX_ATTEMPTS must be at least 1",
+		)
+	}
+
+	if retry.InitialBackoff <= 0 {
+		return fmt.Errorf(
+			"EXTERNAL_RETRY_INITIAL_BACKOFF must be greater than zero",
+		)
+	}
+
+	if retry.MaxBackoff < retry.InitialBackoff {
+		return fmt.Errorf(
+			"EXTERNAL_RETRY_MAX_BACKOFF must be greater than or equal to initial backoff",
+		)
+	}
+
+	if retry.BackoffMultiplier < 1 {
+		return fmt.Errorf(
+			"EXTERNAL_RETRY_BACKOFF_MULTIPLIER must be at least 1",
+		)
+	}
+
+	if retry.Jitter < 0 ||
+		retry.Jitter > 1 {
+		return fmt.Errorf(
+			"EXTERNAL_RETRY_JITTER must be between 0 and 1",
 		)
 	}
 

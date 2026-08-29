@@ -235,3 +235,36 @@ func TestRedditObservabilityLogDoesNotContainSensitiveData(
 		}
 	}
 }
+
+func TestRedditRetryObservability(
+	t *testing.T,
+) {
+	metrics.ExternalRetriesTotal.Reset()
+	metrics.ExternalRetryDelay.Reset()
+
+	event := external.RetryEvent{
+		Attempt:     1,
+		NextAttempt: 2,
+		Delay:       25 * time.Millisecond,
+		ErrorType:   "rate_limited",
+	}
+
+	observeRetry(
+		nil,
+		"fetch",
+		event,
+	)
+
+	value := metrics.ExternalRetriesTotal.
+		WithLabelValues(
+			string(external.SourceReddit),
+			"fetch",
+			"rate_limited",
+		)
+
+	if value == nil {
+		t.Fatal(
+			"expected retry counter to be initialized",
+		)
+	}
+}
