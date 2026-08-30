@@ -103,6 +103,10 @@ func validateReddit(
 		)
 	}
 
+	if err := validateCache(cfg); err != nil {
+		return err
+	}
+
 	return nil
 }
 func validateWorker(cfg Config) error {
@@ -191,6 +195,34 @@ func validateRetry(
 		retry.Jitter > 1 {
 		return fmt.Errorf(
 			"EXTERNAL_RETRY_JITTER must be between 0 and 1",
+		)
+	}
+
+	return nil
+}
+
+func validateCache(
+	cfg Config,
+) error {
+	if !cfg.Cache.Enabled {
+		return nil
+	}
+
+	if cfg.Cache.MaxEntries < 1 {
+		return fmt.Errorf(
+			"CACHE_MAX_ENTRIES must be greater than zero",
+		)
+	}
+
+	if cfg.Cache.RedditListingTTL <= 0 {
+		return fmt.Errorf(
+			"CACHE_REDDIT_LISTING_TTL must be greater than zero",
+		)
+	}
+
+	if cfg.Cache.CommunityTTL <= 0 {
+		return fmt.Errorf(
+			"CACHE_COMMUNITY_TTL must be greater than zero",
 		)
 	}
 

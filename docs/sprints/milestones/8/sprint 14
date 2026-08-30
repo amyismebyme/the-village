@@ -7,3 +7,17 @@
 •	A 5xx or timeout can use exponential backoff.
 •	Permanent errors such as 401, 403, 404, or invalid input fail without retries.
 •	Cancellation stops the process instead of starting another attempt.
+
+
+Defines a simple Wait(ctx) rule for outbound integrations.
+Each provider gets its own limiter, so one provider does not throttle another.
+OAuth and Reddit API requests share the same Reddit pacing rule.
+Understands HTTP 429 and uses the server's Retry-After value when provided.
+Temporary failures wait longer between retries, up to a maximum.
+Centralizes which errors can retry and how many attempts are allowed.
+Cancellation stops waiting and prevents another retry.
+Retries are visible in safe logs and low-cardinality Prometheus metrics.
+Checks immediate requests, pacing, concurrency, cancellation, and source independence.
+The real Reddit worker uses the shared Reddit limiter for authentication and API calls.
+A temporary Reddit failure does not permanently break the worker; a later run can recover.
+Formatting, tests, race detection, vet, lint, and integration checks must all pass.
