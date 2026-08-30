@@ -1,0 +1,68 @@
+15.1 Cache contract
+    Get / Set / Delete / Clear
+    cache miss is not an error
+    context cancellation is honored
+
+15.2 In-memory cache
+    concurrent-safe
+    TTL expiration works
+    caller cannot mutate cached bytes
+    delete works
+    clear works
+
+15.3 Cache keys
+    deterministic
+    namespaced
+    operation-aware
+    paging state included
+    no secrets/tokens/request IDs
+
+15.4 TTL policy
+    centralized
+    configurable
+    validated
+    safe defaults
+
+
+
+    Final Sprint 15 acceptance criteria
+    15.1  Cache contract
+          ✅
+
+    15.2  In-memory implementation
+          ✅
+
+    15.3  Cache key design
+          ✅
+
+    15.4  TTL policy
+          ✅
+
+    15.5  Size / LRU eviction
+          ✅
+
+    15.6  Reddit listing cache
+          ✅
+
+    15.7  Cache bypass / refresh
+          ✅
+
+    15.8  Cache + context behavior
+          ✅
+
+    15.9  Cache observability
+          ✅
+
+    15.10 Cache concurrency tests
+          ✅
+
+    15.11 Worker + cache integration
+          → two worker runs produce one Reddit listing request
+
+    15.12 Staleness / failure
+          → expired data is not served
+          → source failure is propagated
+          → corrupt cache recovers automatically
+
+    15.13 Verification gate
+          → all checks pass

@@ -3,13 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/prometheus/client_golang/prometheus"
-
+	"github.com/amyismebyme/the-village/apps/api/internal/cache"
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
 	"github.com/amyismebyme/the-village/apps/api/internal/database"
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
@@ -99,6 +99,60 @@ func Run() error {
 		return fmt.Errorf(
 			"register metrics: %w",
 			err,
+		)
+	}
+
+	//------------------------------------------------------------------
+	// Cache
+	//------------------------------------------------------------------
+
+	var (
+		applicationCache cache.Cache
+		memoryCache      *cache.Memory
+	)
+
+	if cfg.Cache.Enabled {
+		var err error
+
+		memoryCache, err = cache.NewMemory(
+			cfg.Cache.MaxEntries,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"create application cache: %w",
+				err,
+			)
+		}
+
+		applicationCache = memoryCache
+
+		if err := metrics.RegisterCache(
+			prometheus.DefaultRegisterer,
+			func() metrics.CacheStats {
+				stats := memoryCache.Stats()
+
+				return metrics.CacheStats{
+					Entries:   stats.Entries,
+					Hits:      stats.Hits,
+					Misses:    stats.Misses,
+					Evictions: stats.Evictions,
+				}
+			},
+		); err != nil {
+			return fmt.Errorf(
+				"register cache metrics: %w",
+				err,
+			)
+		}
+
+		appLogger.Info(
+			"application cache initialized",
+			"max_entries",
+			cfg.Cache.MaxEntries,
+			"reddit_listing_ttl_seconds",
+			int64(
+				cfg.Cache.RedditListingTTL.Seconds(),
+			),
 		)
 	}
 
@@ -249,6 +303,18 @@ func Run() error {
 			reddit.NewPostNormalizer(),
 		)
 
+		if applicationCache != nil {
+			if err := redditIngestion.SetCache(
+				applicationCache,
+				cfg.Cache.RedditListingTTL,
+			); err != nil {
+				return fmt.Errorf(
+					"configure Reddit cache: %w",
+					err,
+				)
+			}
+		}
+
 		redditWorker, err := reddit.NewIngestionWorker(
 			redditAuthenticator,
 			redditIngestion,
@@ -268,18 +334,6 @@ func Run() error {
 
 		redditWorker.SetLogger(
 			appLogger,
-		)
-
-		redditClient.SetLogger(
-			appLogger,
-		)
-
-		redditClient.SetRateLimiter(
-			redditLimiter,
-		)
-
-		redditClient.SetRetryPolicy(
-			retryPolicy,
 		)
 
 		redditLifecycle := worker.NewLifecycle(
@@ -410,8 +464,8 @@ func Run() error {
 	)
 	defer cancel()
 
-	// Stop workers first because workers may depend on
-	// application resources such as HTTP clients or the database.
+	// Stop workers before the HTTP server because workers may depend
+	// on application resources during their final operation.
 	if err := workerRuntime.Stop(
 		shutdownCtx,
 	); err != nil {

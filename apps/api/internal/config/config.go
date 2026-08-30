@@ -50,6 +50,7 @@ type Config struct {
 	Database        database.Config
 	External        ExternalConfig
 	Worker          WorkerConfig
+	Cache           CacheConfig
 }
 
 type RedditConfig struct {
@@ -60,6 +61,13 @@ type RedditConfig struct {
 	BaseURL         string
 	AuthBaseURL     string
 	RequestInterval time.Duration
+}
+
+type CacheConfig struct {
+	Enabled          bool
+	MaxEntries       int
+	RedditListingTTL time.Duration
+	CommunityTTL     time.Duration
 }
 
 // Load reads environment variables.
@@ -144,6 +152,26 @@ func Load() Config {
 					1,
 				),
 			},
+		},
+
+		Cache: CacheConfig{
+			Enabled: getBool(
+				"CACHE_ENABLED",
+				true,
+			),
+			MaxEntries: getInt(
+				"CACHE_MAX_ENTRIES",
+				1000,
+			),
+			RedditListingTTL: getDuration(
+				"CACHE_REDDIT_LISTING_TTL",
+				120,
+			),
+
+			CommunityTTL: getDuration(
+				"CACHE_COMMUNITY_TTL",
+				300,
+			),
 		},
 
 		Worker: WorkerConfig{
