@@ -5,7 +5,10 @@ package integration
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +32,7 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 					"scope":"*"
 				}`,
 			},
+
 			"/r/toronto/new": {
 				StatusCode: http.StatusOK,
 				Body: `{
@@ -47,17 +51,17 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 
 	defer server.Close()
 
-	clientHTTP := testutil.NewScriptedHTTPClient(
+	clientHTTP := newScriptedHTTPClient(
 		server.Server.Client(),
 	)
 
 	clientHTTP.SetScript(
 		"/r/toronto/new",
-		testutil.HTTPOutcome{
+		scriptedHTTPOutcome{
 			StatusCode: http.StatusServiceUnavailable,
 			Body:       "dependency unavailable",
 		},
-		testutil.HTTPOutcome{
+		scriptedHTTPOutcome{
 			StatusCode: http.StatusOK,
 			Body: `{
 				"data":{
@@ -137,6 +141,7 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 	authenticator.SetRateLimiter(
 		redditLimiter,
 	)
+
 	authenticator.SetRetryPolicy(
 		retryPolicy,
 	)
@@ -144,6 +149,7 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 	client.SetRateLimiter(
 		redditLimiter,
 	)
+
 	client.SetRetryPolicy(
 		retryPolicy,
 	)
@@ -195,7 +201,7 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 
 		select {
 		case <-deadline.C:
-			t.Fatal(
+			t.Fatalf(
 				"worker did not reach the restored dependency",
 			)
 
@@ -224,3 +230,108 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 		)
 	}
 }
+
+type scriptedHTTPOutcome struct {
+	StatusCode int
+	Body       string
+}
+
+type scriptedHTTPClient struct {
+	client *http.Client
+
+	mu      sync.Mutex
+	scripts map[string][]scriptedHTTPOutcome
+	calls   map[string]int
+}
+
+func newScriptedHTTPClient(
+	client *http.Client,
+) *scriptedHTTPClient {
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	return &scriptedHTTPClient{
+		client:  client,
+		scripts: make(map[string][]scriptedHTTPOutcome),
+		calls:   make(map[string]int),
+	}
+}
+
+func (c *scriptedHTTPClient) SetScript(
+	path string,
+	outcomes ...scriptedHTTPOutcome,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.scripts[path] = append(
+		[]scriptedHTTPOutcome(nil),
+		outcomes...,
+	)
+}
+
+func (c *scriptedHTTPClient) Calls(
+	path string,
+) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.calls[path]
+}
+
+func (c *scriptedHTTPClient) Do(
+	req *http.Request,
+) (*http.Response, error) {
+	if req == nil {
+		return nil, errors.New(
+			"scripted HTTP client: request is required",
+		)
+	}
+
+	path := req.URL.Path
+
+	c.mu.Lock()
+
+	c.calls[path]++
+
+	outcomes := c.scripts[path]
+
+	if len(outcomes) > 0 {
+		outcome := outcomes[0]
+
+		c.scripts[path] = outcomes[1:]
+
+		c.mu.Unlock()
+
+		return newScriptedResponse(
+			req,
+			outcome,
+		), nil
+	}
+
+	c.mu.Unlock()
+
+	return c.client.Do(req)
+}
+
+func newScriptedResponse(
+	req *http.Request,
+	outcome scriptedHTTPOutcome,
+) *http.Response {
+	return &http.Response{
+		StatusCode: outcome.StatusCode,
+		Status:     http.StatusText(outcome.StatusCode),
+		Body: io.NopCloser(
+			strings.NewReader(outcome.Body),
+		),
+		Header: http.Header{
+			"Content-Type": []string{
+				"application/json",
+			},
+		},
+		Request: req,
+	}
+}
+
+var _ external.HTTPClient = (*scriptedHTTPClient)(nil)
