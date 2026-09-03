@@ -330,19 +330,20 @@ func (s *IngestionService) normalizeListing(
 			)
 		}
 
-		identity := item.Identity()
-
-		if err := identity.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"reddit ingestion: validate identity %q: %w",
-				child.Data.ID,
-				err,
-			)
-		}
-
 		items = append(
 			items,
 			item,
+		)
+	}
+
+	items, err := external.DeduplicateItems(
+		ctx,
+		items,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"reddit ingestion: deduplicate items: %w",
+			err,
 		)
 	}
 

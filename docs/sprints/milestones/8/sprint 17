@@ -1,0 +1,49 @@
+bjective
+
+Make external ingestion safe under duplicate delivery, concurrent workers, retries, and replayed batches. The authoritative identity is (Source, ExternalID); PostgreSQL provides the durable uniqueness boundary.
+
+Final task outcomes
+
+Task
+
+Implementation
+
+Verification
+
+17.7 Concurrent ingestion safety
+
+Atomic PostgreSQL upsert/batch transaction on UNIQUE(source, external_id). Concurrent callers converge on one row.
+
+Concurrent integration test; exactly one persisted identity.
+
+17.8 Retry + deduplication interaction
+
+Retries remain in the external client. Deduplication runs only after the final successful listing is obtained.
+
+Scripted 503 -> 200 test; final batch contains unique identities.
+
+17.9 Deduplication integration tests
+
+Exercise normalized items through the database repository boundary; repeated delivery stays idempotent.
+
+Replay + duplicate-batch + source-isolation integration coverage.
+
+17.10 Verification gate
+
+Dedicated Sprint 17 PowerShell gate runs formatting, build, unit, race, vet, lint, integration, and focused idempotency tests.
+
+One command must pass before Sprint 17 closes.
+
+Behavior contract
+
+Same Source + same ExternalID = one logical item.
+
+Different Source + same ExternalID = different items.
+
+Within one ingestion batch, first occurrence wins.
+
+Across replays, database upsert preserves one durable row.
+
+Concurrent ingestion cannot create duplicate identities because uniqueness is enforced by PostgreSQL.
+
+A retry is a transport concern; deduplication is a data-integrity concern. They remain separate layers.
