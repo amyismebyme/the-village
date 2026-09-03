@@ -11,10 +11,10 @@ type ExternalItemRepository interface {
 		ctx context.Context,
 		item external.Item,
 	) error
-    	UpsertBatch(
-    		ctx context.Context,
-    		items []external.Item,
-    	) error
+	UpsertBatch(
+		ctx context.Context,
+		items []external.Item,
+	) error
 	FindByIdentity(
 		ctx context.Context,
 		identity external.Identity,
