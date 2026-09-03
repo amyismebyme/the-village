@@ -46,6 +46,45 @@ func TestMigrationsApplied(t *testing.T) {
 		)
 	})
 
+	t.Run("external_items exists", func(t *testing.T) {
+		assertTableExists(
+			t,
+			ctx,
+			db,
+			"external_items",
+		)
+	})
+
+	t.Run("external_items identity constraint exists", func(t *testing.T) {
+		const query = `
+SELECT EXISTS (
+	SELECT 1
+	FROM pg_constraint
+	WHERE conname = 'external_items_identity_unique'
+)
+`
+
+		var exists bool
+
+		if err := db.Pool().
+			QueryRow(
+				ctx,
+				query,
+			).
+			Scan(&exists); err != nil {
+			t.Fatalf(
+				"query failed: %v",
+				err,
+			)
+		}
+
+		if !exists {
+			t.Fatal(
+				"external_items_identity_unique constraint does not exist",
+			)
+		}
+	})
+
 	// Uncomment these once the indexes exist.
 	/*
 		t.Run("communities_name_idx exists", func(t *testing.T) {

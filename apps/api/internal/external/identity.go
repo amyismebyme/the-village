@@ -7,28 +7,44 @@ import (
 )
 
 // Identity uniquely identifies an item from an external provider.
+//
+// An external identity is the combination of Source and ExternalID.
+// The same ExternalID from two different sources is therefore valid.
 type Identity struct {
 	Source     Source
 	ExternalID string
 }
 
+// Normalize returns the canonical representation of an identity.
+func (i Identity) Normalize() Identity {
+	return Identity{
+		Source:     Source(strings.TrimSpace(string(i.Source))),
+		ExternalID: strings.TrimSpace(i.ExternalID),
+	}
+}
+
 func (i Identity) Validate() error {
-	if strings.TrimSpace(string(i.Source)) == "" {
+	normalized := i.Normalize()
+
+	if normalized.Source == "" {
 		return ErrInvalidConfig
 	}
 
-	if strings.TrimSpace(i.ExternalID) == "" {
+	if normalized.ExternalID == "" {
 		return ErrInvalidConfig
 	}
 
 	return nil
 }
 
+// Key returns the deterministic provider-neutral identity key.
 func (i Identity) Key() string {
+	normalized := i.Normalize()
+
 	return fmt.Sprintf(
 		"%s:%s",
-		i.Source,
-		i.ExternalID,
+		normalized.Source,
+		normalized.ExternalID,
 	)
 }
 
@@ -36,10 +52,17 @@ func SameIdentity(
 	left Identity,
 	right Identity,
 ) bool {
+	left = left.Normalize()
+	right = right.Normalize()
+
 	return left.Source == right.Source &&
 		left.ExternalID == right.ExternalID
 }
 
+// ValidateUniqueIdentities performs strict duplicate detection.
+//
+// This is useful when a caller wants duplicates to be treated as an error.
+// Normal ingestion uses DeduplicateItems when duplicates should be skipped.
 func ValidateUniqueIdentities(
 	identities []Identity,
 ) error {

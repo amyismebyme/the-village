@@ -1265,3 +1265,117 @@ func TestIngestListingCacheHitStillHonorsCancellation(
 		)
 	}
 }
+
+func TestIngestListingDeduplicatesExternalIdentities(
+	t *testing.T,
+) {
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(
+				w http.ResponseWriter,
+				r *http.Request,
+			) {
+				w.Header().Set(
+					"Content-Type",
+					"application/json",
+				)
+
+				_, _ = w.Write(
+					[]byte(`{
+						"data": {
+							"after": null,
+							"before": null,
+							"children": [
+								{
+									"kind": "t3",
+									"data": {
+										"id": "same-id",
+										"title": "First occurrence",
+										"subreddit": "toronto"
+									}
+								},
+								{
+									"kind": "t3",
+									"data": {
+										"id": "same-id",
+										"title": "Duplicate occurrence",
+										"subreddit": "toronto"
+									}
+								},
+								{
+									"kind": "t3",
+									"data": {
+										"id": "unique-id",
+										"title": "Unique occurrence",
+										"subreddit": "toronto"
+									}
+								}
+							]
+						}
+					}`),
+				)
+			},
+		),
+	)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.Client(),
+		server.URL,
+		"the-village/test",
+		time.Second,
+	)
+	if err != nil {
+		t.Fatalf(
+			"create Reddit client: %v",
+			err,
+		)
+	}
+
+	service := NewIngestionService(
+		client,
+		NewPostNormalizer(),
+	)
+
+	items, err := service.IngestListing(
+		context.Background(),
+		"test-token",
+		"toronto",
+		10,
+		"",
+	)
+	if err != nil {
+		t.Fatalf(
+			"ingest listing: %v",
+			err,
+		)
+	}
+
+	if len(items) != 2 {
+		t.Fatalf(
+			"expected 2 unique items, got %d",
+			len(items),
+		)
+	}
+
+	if items[0].ExternalID != "same-id" {
+		t.Fatalf(
+			"expected first identity to be same-id, got %q",
+			items[0].ExternalID,
+		)
+	}
+
+	if items[0].Title != "First occurrence" {
+		t.Fatalf(
+			"expected first occurrence to win, got %q",
+			items[0].Title,
+		)
+	}
+
+	if items[1].ExternalID != "unique-id" {
+		t.Fatalf(
+			"expected second identity to be unique-id, got %q",
+			items[1].ExternalID,
+		)
+	}
+}

@@ -2,6 +2,7 @@ package external
 
 import (
 	"context"
+	"fmt"
 )
 
 type Item struct {
@@ -20,12 +21,19 @@ func (i Item) Identity() Identity {
 }
 
 func (i Item) Validate() error {
-	if i.Source == "" {
+	identity := i.Identity()
+
+	// Preserve Item-level payload semantics.
+	if identity.Source == "" ||
+		identity.ExternalID == "" {
 		return ErrInvalidPayload
 	}
 
-	if i.ExternalID == "" {
-		return ErrInvalidPayload
+	if err := identity.Validate(); err != nil {
+		return fmt.Errorf(
+			"validate identity: %w",
+			err,
+		)
 	}
 
 	return nil
