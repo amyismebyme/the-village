@@ -114,6 +114,12 @@ func validateWorker(cfg Config) error {
 		return nil
 	}
 
+	if !cfg.External.Reddit.Enabled {
+		return fmt.Errorf(
+			"REDDIT_ENABLED must be true when WORKER_ENABLED is true",
+		)
+	}
+
 	if cfg.Worker.Reddit.IngestInterval <= 0 {
 		return fmt.Errorf(
 			"REDDIT_INGEST_INTERVAL must be greater than zero",

@@ -25,7 +25,8 @@ func NewScheduler(
 	}, nil
 }
 
-// Run executes fn immediately and returns the first function error.
+// Run executes fn immediately and stops on the first non-cancellation
+// function error.
 func (s *Scheduler) Run(
 	ctx context.Context,
 	fn func(context.Context) error,
@@ -39,11 +40,12 @@ func (s *Scheduler) Run(
 	)
 }
 
-// RunResilient executes fn immediately and continues scheduling even
-// when an individual run fails.
+// RunResilient executes fn immediately and continues scheduling after
+// individual execution failures.
 //
-// onError receives each run failure. It must not block indefinitely.
-// Context cancellation remains a normal termination signal.
+// Individual execution failures are reported to onError. Context
+// cancellation is normal termination and is not reported as a worker
+// failure.
 func (s *Scheduler) RunResilient(
 	ctx context.Context,
 	fn func(context.Context) error,
@@ -57,7 +59,15 @@ func (s *Scheduler) RunResilient(
 		ctx,
 		fn,
 		func(err error) error {
+			if errors.Is(
+				err,
+				context.Canceled,
+			) && ctx.Err() != nil {
+				return ctx.Err()
+			}
+
 			onError(err)
+
 			return nil
 		},
 	)
@@ -80,14 +90,22 @@ func (s *Scheduler) run(
 		)
 	}
 
+	if handleError == nil {
+		return errors.New(
+			"worker scheduler: error handler is required",
+		)
+	}
+
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
 		if err := fn(ctx); err != nil {
-			if errors.Is(err, context.Canceled) &&
-				ctx.Err() != nil {
+			if errors.Is(
+				err,
+				context.Canceled,
+			) && ctx.Err() != nil {
 				return ctx.Err()
 			}
 
@@ -99,7 +117,9 @@ func (s *Scheduler) run(
 			}
 		}
 
-		timer := time.NewTimer(s.Interval)
+		timer := time.NewTimer(
+			s.Interval,
+		)
 
 		select {
 		case <-ctx.Done():

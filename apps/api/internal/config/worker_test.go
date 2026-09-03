@@ -159,3 +159,37 @@ func TestEnabledWorkerRejectsInvalidLimit(
 		)
 	}
 }
+
+func TestEnabledWorkerRequiresReddit(
+	t *testing.T,
+) {
+	t.Setenv(
+		"WORKER_ENABLED",
+		"true",
+	)
+
+	t.Setenv(
+		"REDDIT_ENABLED",
+		"false",
+	)
+
+	cfg := Load()
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal(
+			"expected enabled workers to require Reddit",
+		)
+	}
+
+	want :=
+		"REDDIT_ENABLED must be true when WORKER_ENABLED is true"
+
+	if err.Error() != want {
+		t.Fatalf(
+			"expected error %q, got %q",
+			want,
+			err.Error(),
+		)
+	}
+}

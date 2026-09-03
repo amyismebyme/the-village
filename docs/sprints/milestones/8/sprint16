@@ -1,0 +1,87 @@
+Sprint outcome
+
+Sprint 16 hardens external dependency behavior without adding a circuit breaker. The system now has explicit retry-exhaustion semantics, fail-closed stale-cache behavior, bounded startup dependency checks, deterministic failure injection, dependency restoration tests, and a repeatable verification gate.
+
+Task
+
+Status
+
+Result
+
+16.1–16.4
+
+Completed
+
+Central error taxonomy + explicit RetryExhaustedError.
+
+16.5
+
+Deferred
+
+Circuit breaker intentionally postponed; current controls are sufficient.
+
+16.6
+
+Completed
+
+Expired/corrupt cache never serves stale data.
+
+16.7
+
+Completed
+
+DB treated as hard startup dependency; worker/Reddit dependency validated.
+
+16.8
+
+Completed
+
+Worker recovers automatically after Reddit dependency restoration.
+
+16.9
+
+Completed
+
+Reusable provider-neutral ScriptedHTTPClient failure harness.
+
+16.10
+
+Completed
+
+Resilience integration tests cover exhaustion and cache fail-closed behavior.
+
+16.11
+
+Completed
+
+PowerShell verification gate for format, tests, race, vet, and resilience integration tests.
+
+Key code changes
+
+internal/external/errors.go — Added ErrorClass and ClassifyError as the single bounded classification API; added RetryExhaustedError; preserved underlying causes; ErrNotFound is permanent.
+
+internal/external/observability.go — Uses ClassifyError for Prometheus labels and structured logs; retry exhaustion is reported separately.
+
+internal/external/retry.go — Returns RetryExhaustedError when the configured retry budget is consumed while preserving the original retryable cause.
+
+internal/external/reddit/worker.go — Uses the shared exported ClassifyError API in worker failure logs.
+
+internal/external/testutil/scripted_client.go — New deterministic HTTP failure-injection harness with ordered outcomes and fallback to a real base HTTP client.
+
+internal/external/testutil/scripted_client_test.go — Tests ordered scripted responses, base fallback, and injected transport errors.
+
+internal/integration/reddit_worker_recovery_test.go — Exercises real Reddit worker scheduling through source outage and restoration; confirms the worker continues and then shuts down cleanly.
+
+internal/integration/resilience_integration_test.go — Adds integration coverage for retry exhaustion and fail-closed expired cache behavior.
+
+scripts/verify-sprint16.ps1 — Repeatable Sprint 16 verification gate: Go version, gofmt, unit tests, race tests, go vet, and targeted resilience integration tests.
+
+Resilience behavior
+
+Retry exhaustion: errors.Is(err, ErrRetryExhausted) is true while the original ErrUpstream/ErrTimeout/ErrRateLimited cause remains discoverable with errors.Is/errors.As.
+
+Stale data: expired cache entries become misses; the application fetches fresh data and does not silently return stale entries when the dependency is unavailable.
+
+Worker recovery: a failed scheduled run is isolated; the scheduler continues and subsequent runs can succeed once the dependency recovers.
+
+Startup: PostgreSQL remains a hard dependency. Reddit is a recoverable worker dependency and is validated when workers are enabled.

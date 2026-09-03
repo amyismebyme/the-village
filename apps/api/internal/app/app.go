@@ -45,7 +45,12 @@ func Run() error {
 
 	appLogger := logger.New(cfg)
 
-	startupCtx := context.Background()
+	startupCtx, startupCancel := context.WithTimeout(
+		context.Background(),
+		cfg.RequestTimeout,
+	)
+
+	defer startupCancel()
 
 	db, err := database.Open(
 		startupCtx,
@@ -57,7 +62,6 @@ func Run() error {
 			err,
 		)
 	}
-
 	startupComplete := false
 
 	defer func() {
@@ -181,11 +185,6 @@ func Run() error {
 	workerRuntime := worker.NewRuntime()
 
 	if cfg.Worker.Enabled {
-		if !cfg.External.Reddit.Enabled {
-			return fmt.Errorf(
-				"worker configuration: Reddit must be enabled when workers are enabled",
-			)
-		}
 
 		// -------------------------------------------------------------
 		// External retry policy
@@ -452,6 +451,19 @@ func Run() error {
 		db.Close()
 
 		return nil
+
+	case err := <-workerRuntime.Errors():
+		appLogger.Error(
+			"background worker stopped unexpectedly",
+			"error_type",
+			external.ClassifyError(err),
+		)
+
+		// A single worker failure must not automatically terminate
+		// the entire API. The worker runtime isolates worker failures.
+		//
+		// The application remains available and shutdown continues
+		// only if the operator sends SIGTERM/SIGINT.
 	}
 
 	//------------------------------------------------------------------

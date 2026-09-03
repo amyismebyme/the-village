@@ -117,8 +117,7 @@ func (w *IngestionWorker) handleFailure(
 		"operation",
 		"ingest",
 		"error_type",
-		redditStatusFromError(err),
-	)
+		string(external.ClassifyError(err)))
 }
 
 func (w *IngestionWorker) runOnce(

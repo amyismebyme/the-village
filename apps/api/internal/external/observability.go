@@ -3,9 +3,10 @@ package external
 import (
 	"context"
 	"errors"
-	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"log/slog"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 )
 
 // ObserveOperation records the bounded Prometheus metrics and the
@@ -25,6 +26,7 @@ func ObserveOperation(
 	err error,
 ) {
 	duration := time.Since(start)
+	errorClass := ClassifyError(err)
 
 	if requestAttempted {
 		metrics.ExternalRequestsTotal.
@@ -49,7 +51,7 @@ func ObserveOperation(
 				WithLabelValues(
 					string(source),
 					operation,
-					classifyErrorType(err),
+					string(errorClass),
 				).
 				Inc()
 		}
@@ -82,46 +84,21 @@ func ObserveOperation(
 		args = append(
 			args,
 			"error_type",
-			classifyErrorType(err),
+			errorClass,
 		)
+	}
+
+	if errors.Is(err, context.Canceled) {
+		logger.Info(
+			"external integration operation canceled",
+			args...,
+		)
+
+		return
 	}
 
 	logger.Info(
 		"external integration operation completed",
 		args...,
 	)
-}
-
-func classifyErrorType(err error) string {
-	switch {
-	case errors.Is(err, ErrUnauthorized):
-		return "unauthorized"
-
-	case errors.Is(err, ErrForbidden):
-		return "forbidden"
-
-	case errors.Is(err, ErrNotFound):
-		return "not_found"
-
-	case errors.Is(err, ErrRateLimited):
-		return "rate_limited"
-
-	case errors.Is(err, ErrTimeout):
-		return "timeout"
-
-	case errors.Is(err, ErrInvalidPayload):
-		return "invalid_payload"
-
-	case errors.Is(err, context.Canceled):
-		return "canceled"
-
-	case errors.Is(err, ErrUpstream):
-		return "upstream"
-
-	case errors.Is(err, ErrInvalidConfig):
-		return "invalid_config"
-
-	default:
-		return "unknown"
-	}
 }
