@@ -78,6 +78,9 @@ func redditStatusFromError(
 	err error,
 ) string {
 	switch {
+	case external.IsRetryExhausted(err):
+		return "retry_exhausted"
+
 	case errors.Is(
 		err,
 		external.ErrUnauthorized,

@@ -420,3 +420,68 @@ func newTestRetryPolicy(
 
 	return policy
 }
+
+func TestRetryPolicyReportsExhaustion(
+	t *testing.T,
+) {
+	policy := newTestRetryPolicy(
+		t,
+		3,
+		time.Millisecond,
+		5*time.Millisecond,
+	)
+
+	var attempts int
+
+	err := policy.Do(
+		context.Background(),
+		func(context.Context) error {
+			attempts++
+			return ErrUpstream
+		},
+		nil,
+	)
+
+	if !IsRetryExhausted(err) {
+		t.Fatalf(
+			"expected retry exhaustion, got %v",
+			err,
+		)
+	}
+
+	if !errors.Is(
+		err,
+		ErrUpstream,
+	) {
+		t.Fatalf(
+			"expected underlying upstream error, got %v",
+			err,
+		)
+	}
+
+	var exhausted *RetryExhaustedError
+
+	if !errors.As(
+		err,
+		&exhausted,
+	) {
+		t.Fatalf(
+			"expected RetryExhaustedError, got %T",
+			err,
+		)
+	}
+
+	if exhausted.Attempts != 3 {
+		t.Fatalf(
+			"expected 3 exhausted attempts, got %d",
+			exhausted.Attempts,
+		)
+	}
+
+	if attempts != 3 {
+		t.Fatalf(
+			"expected 3 operation attempts, got %d",
+			attempts,
+		)
+	}
+}

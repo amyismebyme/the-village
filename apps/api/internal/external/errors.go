@@ -1,7 +1,9 @@
 package external
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -17,7 +19,116 @@ var (
 	ErrTimeout        = errors.New("external request timeout")
 	ErrInvalidPayload = errors.New("external invalid payload")
 	ErrInvalidConfig  = errors.New("external invalid configuration")
+
+	ErrRetryExhausted = errors.New("external retry exhausted")
 )
+
+// ErrorClass is the bounded classification used for external
+// integration observability and logging.
+//
+// Keep this set intentionally small and stable because values are
+// exposed through Prometheus labels.
+type ErrorClass string
+
+const (
+	ErrorClassUnknown        ErrorClass = "unknown"
+	ErrorClassCanceled       ErrorClass = "canceled"
+	ErrorClassUnauthorized   ErrorClass = "unauthorized"
+	ErrorClassForbidden      ErrorClass = "forbidden"
+	ErrorClassNotFound       ErrorClass = "not_found"
+	ErrorClassRateLimited    ErrorClass = "rate_limited"
+	ErrorClassUpstream       ErrorClass = "upstream"
+	ErrorClassTimeout        ErrorClass = "timeout"
+	ErrorClassInvalidPayload ErrorClass = "invalid_payload"
+	ErrorClassInvalidConfig  ErrorClass = "invalid_config"
+	ErrorClassRetryExhausted ErrorClass = "retry_exhausted"
+)
+
+// ClassifyError converts an external error into a bounded ErrorClass.
+//
+// The function uses errors.Is so wrapped and joined errors retain their
+// meaningful classification.
+func ClassifyError(err error) ErrorClass {
+	switch {
+	case err == nil:
+		return ErrorClassUnknown
+
+	case errors.Is(err, ErrRetryExhausted):
+		return ErrorClassRetryExhausted
+
+	case errors.Is(err, ErrUnauthorized):
+		return ErrorClassUnauthorized
+
+	case errors.Is(err, ErrForbidden):
+		return ErrorClassForbidden
+
+	case errors.Is(err, ErrNotFound):
+		return ErrorClassNotFound
+
+	case errors.Is(err, ErrRateLimited):
+		return ErrorClassRateLimited
+
+	case errors.Is(err, ErrUpstream):
+		return ErrorClassUpstream
+
+	case errors.Is(err, ErrTimeout):
+		return ErrorClassTimeout
+
+	case errors.Is(err, ErrInvalidPayload):
+		return ErrorClassInvalidPayload
+
+	case errors.Is(err, ErrInvalidConfig):
+		return ErrorClassInvalidConfig
+
+	case errors.Is(err, context.Canceled):
+		return ErrorClassCanceled
+
+	default:
+		return ErrorClassUnknown
+	}
+}
+
+type RetryExhaustedError struct {
+	Cause    error
+	Attempts int
+}
+
+func (e *RetryExhaustedError) Error() string {
+	if e == nil {
+		return ErrRetryExhausted.Error()
+	}
+
+	if e.Cause == nil {
+		return fmt.Sprintf(
+			"%s after %d attempts",
+			ErrRetryExhausted,
+			e.Attempts,
+		)
+	}
+
+	return fmt.Sprintf(
+		"%s after %d attempts: %v",
+		ErrRetryExhausted,
+		e.Attempts,
+		e.Cause,
+	)
+}
+
+func (e *RetryExhaustedError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	return e.Cause
+}
+
+func (e *RetryExhaustedError) Is(target error) bool {
+	return target == ErrRetryExhausted
+}
+
+func IsRetryExhausted(err error) bool {
+	return errors.Is(err, ErrRetryExhausted)
+}
 
 type RateLimitError struct {
 	Cause      error
@@ -72,6 +183,9 @@ func IsPermanent(err error) bool {
 	case errors.Is(err, ErrForbidden):
 		return true
 
+	case errors.Is(err, ErrNotFound):
+		return true
+
 	case errors.Is(err, ErrInvalidPayload):
 		return true
 
@@ -97,6 +211,10 @@ func IsUnauthorized(err error) bool {
 
 func IsForbidden(err error) bool {
 	return errors.Is(err, ErrForbidden)
+}
+
+func IsNotFound(err error) bool {
+	return errors.Is(err, ErrNotFound)
 }
 
 func IsInvalidPayload(err error) bool {

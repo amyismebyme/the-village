@@ -46,11 +46,19 @@ func (r *Runtime) Add(
 func (r *Runtime) Start(
 	ctx context.Context,
 ) error {
+	if ctx == nil {
+		return errors.New(
+			"worker runtime: context is required",
+		)
+	}
+
 	r.mu.Lock()
+
 	lifecycles := append(
 		[]*Lifecycle(nil),
 		r.lifecycles...,
 	)
+
 	r.mu.Unlock()
 
 	for _, lifecycle := range lifecycles {
@@ -59,12 +67,21 @@ func (r *Runtime) Start(
 		go func(lc *Lifecycle) {
 			defer r.wg.Done()
 
-			if err := lc.Run(ctx); err != nil &&
-				!errors.Is(err, context.Canceled) {
-				select {
-				case r.errCh <- err:
-				default:
-				}
+			err := lc.Run(ctx)
+
+			if err == nil ||
+				errors.Is(
+					err,
+					context.Canceled,
+				) {
+				return
+			}
+
+			select {
+			case r.errCh <- err:
+			default:
+				// Do not allow one broken worker to block the
+				// runtime forever trying to report an error.
 			}
 		}(lifecycle)
 	}
@@ -75,11 +92,19 @@ func (r *Runtime) Start(
 func (r *Runtime) Stop(
 	ctx context.Context,
 ) error {
+	if ctx == nil {
+		return errors.New(
+			"worker runtime: stop context is required",
+		)
+	}
+
 	r.mu.Lock()
+
 	lifecycles := append(
 		[]*Lifecycle(nil),
 		r.lifecycles...,
 	)
+
 	r.mu.Unlock()
 
 	var firstErr error

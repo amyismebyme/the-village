@@ -3,7 +3,6 @@ package external
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -57,8 +56,6 @@ func (p *RetryPolicy) Do(
 		)
 	}
 
-	var lastErr error
-
 	for attempt := 1; attempt <= p.MaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -70,18 +67,23 @@ func (p *RetryPolicy) Do(
 			return nil
 		}
 
-		lastErr = err
-
-		// Once the caller has cancelled or the deadline has expired,
-		// retrying would violate the caller's context contract.
+		// Once cancellation or deadline expiration occurs, retrying
+		// would violate the caller's context contract.
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
 
-		// Permanent error or attempt budget exhausted.
-		if !IsRetryable(err) ||
-			attempt == p.MaxAttempts {
+		// Non-retryable errors are terminal.
+		if !IsRetryable(err) {
 			return err
+		}
+
+		// The retry budget has been consumed.
+		if attempt == p.MaxAttempts {
+			return &RetryExhaustedError{
+				Cause:    err,
+				Attempts: attempt,
+			}
 		}
 
 		delay := p.Backoff.Delay(attempt)
@@ -105,7 +107,7 @@ func (p *RetryPolicy) Do(
 					Attempt:     attempt,
 					NextAttempt: attempt + 1,
 					Delay:       delay,
-					ErrorType:   classifyErrorType(err),
+					ErrorType:   string(ClassifyError(err)),
 				},
 			)
 		}
@@ -118,9 +120,10 @@ func (p *RetryPolicy) Do(
 		}
 	}
 
-	return fmt.Errorf(
-		"retry policy: exhausted attempts: %w",
-		lastErr,
+	// The loop always returns from inside the attempt handling.
+	// Keep this as a defensive fallback.
+	return errors.New(
+		"retry policy: unreachable state",
 	)
 }
 
