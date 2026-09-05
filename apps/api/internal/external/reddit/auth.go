@@ -252,6 +252,7 @@ func (a *Authenticator) fetchToken(
 		}
 
 		requestAttempted = true
+		attemptStart := time.Now()
 
 		response, requestErr := a.client.DoChecked(
 			operationCtx,
@@ -259,6 +260,13 @@ func (a *Authenticator) fetchToken(
 		)
 		if requestErr != nil {
 			status = redditStatusFromError(
+				requestErr,
+			)
+
+			observeRequestAttempt(
+				"authenticate",
+				status,
+				attemptStart,
 				requestErr,
 			)
 
@@ -272,48 +280,64 @@ func (a *Authenticator) fetchToken(
 
 		var token tokenResponse
 
-		if decodeErr := DecodeJSON(
-			response,
-			&token,
-		); decodeErr != nil {
+		requestPayloadErr := func() error {
+			if decodeErr := DecodeJSON(
+				response,
+				&token,
+			); decodeErr != nil {
+				return fmt.Errorf(
+					"%w: decode token response",
+					external.ErrInvalidPayload,
+				)
+			}
+
+			if strings.TrimSpace(
+				token.AccessToken,
+			) == "" {
+				return fmt.Errorf(
+					"%w: missing access token",
+					external.ErrInvalidPayload,
+				)
+			}
+
+			if strings.TrimSpace(
+				token.TokenType,
+			) == "" {
+				return fmt.Errorf(
+					"%w: missing token type",
+					external.ErrInvalidPayload,
+				)
+			}
+
+			if token.ExpiresIn <= 0 {
+				return fmt.Errorf(
+					"%w: invalid token expiry",
+					external.ErrInvalidPayload,
+				)
+			}
+
+			return nil
+		}()
+
+		if requestPayloadErr != nil {
 			status = "invalid_payload"
 
-			return fmt.Errorf(
-				"%w: decode token response",
-				external.ErrInvalidPayload,
+			observeRequestAttempt(
+				"authenticate",
+				fmt.Sprintf("%d", response.StatusCode),
+				attemptStart,
+				requestPayloadErr,
 			)
+
+			return requestPayloadErr
 		}
 
-		if strings.TrimSpace(
-			token.AccessToken,
-		) == "" {
-			status = "invalid_payload"
-
-			return fmt.Errorf(
-				"%w: missing access token",
-				external.ErrInvalidPayload,
-			)
-		}
-
-		if strings.TrimSpace(
-			token.TokenType,
-		) == "" {
-			status = "invalid_payload"
-
-			return fmt.Errorf(
-				"%w: missing token type",
-				external.ErrInvalidPayload,
-			)
-		}
-
-		if token.ExpiresIn <= 0 {
-			status = "invalid_payload"
-
-			return fmt.Errorf(
-				"%w: invalid token expiry",
-				external.ErrInvalidPayload,
-			)
-		}
+		observeRequestAttempt(
+			"authenticate",
+			status,
+			attemptStart,
+			nil,
+		)
 
 		token.ExpiresAt = time.Now().Add(
 			time.Duration(

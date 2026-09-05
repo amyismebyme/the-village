@@ -70,7 +70,19 @@ func NewCommunityService(
 func (s *communityService) Create(
 	ctx context.Context,
 	community *model.Community,
-) error {
+) (err error) {
+	defer func() {
+		status := "success"
+
+		if err != nil {
+			status = "failure"
+		}
+
+		metrics.CommunityCreateTotal.
+			WithLabelValues(status).
+			Inc()
+	}()
+
 	if community == nil {
 		return ErrNilCommunity
 	}
@@ -81,7 +93,10 @@ func (s *communityService) Create(
 		return err
 	}
 
-	existing, err := s.slugExists(ctx, community.Slug)
+	existing, err := s.slugExists(
+		ctx,
+		community.Slug,
+	)
 	if err != nil {
 		return fmt.Errorf(
 			"community service: check slug %q: %w",
@@ -98,8 +113,14 @@ func (s *communityService) Create(
 		)
 	}
 
-	if err := s.repository.Create(ctx, community); err != nil {
-		if errors.Is(err, repository.ErrAlreadyExists) {
+	if err := s.repository.Create(
+		ctx,
+		community,
+	); err != nil {
+		if errors.Is(
+			err,
+			repository.ErrAlreadyExists,
+		) {
 			return fmt.Errorf(
 				"%w: slug %q",
 				ErrCommunityAlreadyExists,
@@ -113,12 +134,7 @@ func (s *communityService) Create(
 		)
 	}
 
-	metrics.CommunityCreateTotal.
-		WithLabelValues("success").
-		Inc()
-
 	return nil
-
 }
 
 func (s *communityService) Get(
@@ -129,7 +145,10 @@ func (s *communityService) Get(
 		return nil, ErrInvalidCommunityID
 	}
 
-	community, err := s.repository.FindByID(ctx, id)
+	community, err := s.repository.FindByID(
+		ctx,
+		id,
+	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"community service: get community %d: %w",
@@ -150,7 +169,9 @@ func (s *communityService) List(
 		limit = DefaultCommunityPageLimit
 	}
 
-	if limit < 1 || limit > MaxCommunityPageLimit || offset < 0 {
+	if limit < 1 ||
+		limit > MaxCommunityPageLimit ||
+		offset < 0 {
 		return CommunityListResult{}, ErrInvalidPagination
 	}
 
@@ -181,7 +202,19 @@ func (s *communityService) List(
 func (s *communityService) Update(
 	ctx context.Context,
 	community *model.Community,
-) error {
+) (err error) {
+	defer func() {
+		status := "success"
+
+		if err != nil {
+			status = "failure"
+		}
+
+		metrics.CommunityUpdateTotal.
+			WithLabelValues(status).
+			Inc()
+	}()
+
 	if community == nil {
 		return ErrNilCommunity
 	}
@@ -196,7 +229,10 @@ func (s *communityService) Update(
 		return err
 	}
 
-	current, err := s.repository.FindByID(ctx, community.ID)
+	current, err := s.repository.FindByID(
+		ctx,
+		community.ID,
+	)
 	if err != nil {
 		return fmt.Errorf(
 			"community service: find community %d: %w",
@@ -207,7 +243,10 @@ func (s *communityService) Update(
 
 	// Only check slug uniqueness if it has changed.
 	if current.Slug != community.Slug {
-		existing, err := s.slugExists(ctx, community.Slug)
+		existing, err := s.slugExists(
+			ctx,
+			community.Slug,
+		)
 		if err != nil {
 			return fmt.Errorf(
 				"community service: check slug %q: %w",
@@ -216,7 +255,8 @@ func (s *communityService) Update(
 			)
 		}
 
-		if existing != nil && existing.ID != community.ID {
+		if existing != nil &&
+			existing.ID != community.ID {
 			return fmt.Errorf(
 				"%w: slug %q",
 				ErrCommunityAlreadyExists,
@@ -229,11 +269,17 @@ func (s *communityService) Update(
 		ctx,
 		community,
 	); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(
+			err,
+			repository.ErrNotFound,
+		) {
 			return repository.ErrNotFound
 		}
 
-		if errors.Is(err, repository.ErrAlreadyExists) {
+		if errors.Is(
+			err,
+			repository.ErrAlreadyExists,
+		) {
 			return fmt.Errorf(
 				"%w: slug %q",
 				ErrCommunityAlreadyExists,
@@ -247,18 +293,25 @@ func (s *communityService) Update(
 		)
 	}
 
-	metrics.CommunityUpdateTotal.
-		WithLabelValues("success").
-		Inc()
-
 	return nil
-
 }
 
 func (s *communityService) Delete(
 	ctx context.Context,
 	id int64,
-) error {
+) (err error) {
+	defer func() {
+		status := "success"
+
+		if err != nil {
+			status = "failure"
+		}
+
+		metrics.CommunityDeleteTotal.
+			WithLabelValues(status).
+			Inc()
+	}()
+
 	if id <= 0 {
 		return ErrInvalidCommunityID
 	}
@@ -279,10 +332,6 @@ func (s *communityService) Delete(
 			err,
 		)
 	}
-
-	metrics.CommunityDeleteTotal.
-		WithLabelValues("success").
-		Inc()
 
 	return nil
 }
@@ -316,15 +365,19 @@ func (s *communityService) slugExists(
 	ctx context.Context,
 	slug string,
 ) (*model.Community, error) {
-
-	community, err := s.repository.FindBySlug(ctx, slug)
+	community, err := s.repository.FindBySlug(
+		ctx,
+		slug,
+	)
 
 	switch {
-
 	case err == nil:
 		return community, nil
 
-	case errors.Is(err, repository.ErrNotFound):
+	case errors.Is(
+		err,
+		repository.ErrNotFound,
+	):
 		return nil, nil
 
 	default:
@@ -339,7 +392,10 @@ func validationField(err error) string {
 
 	var fieldErr validation.FieldError
 
-	if !errors.As(err, &fieldErr) {
+	if !errors.As(
+		err,
+		&fieldErr,
+	) {
 		return "unknown"
 	}
 

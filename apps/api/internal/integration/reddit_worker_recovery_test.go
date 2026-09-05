@@ -162,10 +162,11 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 	worker, err := reddit.NewIngestionWorker(
 		authenticator,
 		ingestion,
+		&integrationExternalItemRepository{},
 		reddit.WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,
-			Interval:  10 * time.Millisecond,
+			Interval:  time.Millisecond,
 		},
 	)
 	if err != nil {

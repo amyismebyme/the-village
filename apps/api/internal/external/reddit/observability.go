@@ -29,6 +29,31 @@ func observeOperation(
 		start,
 		err,
 	)
+
+	// Retry exhaustion is a logical operation event. Count it here,
+	// exactly once, when the operation ultimately returns the exhausted
+	// error.
+	if external.IsRetryExhausted(err) {
+		observeRetryExhausted(
+			logger,
+			operation,
+		)
+	}
+}
+
+func observeRequestAttempt(
+	operation string,
+	status string,
+	start time.Time,
+	err error,
+) {
+	external.ObserveRequestAttempt(
+		external.SourceReddit,
+		operation,
+		status,
+		start,
+		err,
+	)
 }
 
 func observeRetry(
@@ -36,6 +61,16 @@ func observeRetry(
 	operation string,
 	event external.RetryEvent,
 ) {
+	// NextAttempt == 0 represents terminal retry exhaustion.
+	//
+	// Do not increment ExternalRetryExhaustedTotal here. The final
+	// logical operation error is observed by observeOperation(), which
+	// owns the single exhaustion metric increment.
+	if event.NextAttempt == 0 {
+		return
+	}
+
+	// This event represents an actual scheduled retry.
 	metrics.ExternalRetriesTotal.
 		WithLabelValues(
 			string(external.SourceReddit),
@@ -74,9 +109,31 @@ func observeRetry(
 	)
 }
 
-func redditStatusFromError(
-	err error,
-) string {
+func observeRetryExhausted(
+	logger *slog.Logger,
+	operation string,
+) {
+	metrics.ExternalRetryExhaustedTotal.
+		WithLabelValues(
+			string(external.SourceReddit),
+			operation,
+		).
+		Inc()
+
+	if logger == nil {
+		return
+	}
+
+	logger.Error(
+		"external request retry budget exhausted",
+		"source",
+		external.SourceReddit,
+		"operation",
+		operation,
+	)
+}
+
+func redditStatusFromError(err error) string {
 	switch {
 	case external.IsRetryExhausted(err):
 		return "retry_exhausted"

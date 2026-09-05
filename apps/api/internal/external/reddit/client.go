@@ -297,6 +297,7 @@ func (c *Client) FetchListing(
 		}
 
 		requestAttempted = true
+		attemptStart := time.Now()
 
 		response, requestErr := c.DoAuthenticated(
 			operationCtx,
@@ -305,6 +306,13 @@ func (c *Client) FetchListing(
 		)
 		if requestErr != nil {
 			status = redditStatusFromError(
+				requestErr,
+			)
+
+			observeRequestAttempt(
+				"fetch",
+				status,
+				attemptStart,
 				requestErr,
 			)
 
@@ -322,11 +330,27 @@ func (c *Client) FetchListing(
 		); requestErr != nil {
 			status = "invalid_payload"
 
-			return fmt.Errorf(
+			wrappedErr := fmt.Errorf(
 				"reddit fetch listing: decode response: %w",
 				requestErr,
 			)
+
+			observeRequestAttempt(
+				"fetch",
+				fmt.Sprintf("%d", response.StatusCode),
+				attemptStart,
+				wrappedErr,
+			)
+
+			return wrappedErr
 		}
+
+		observeRequestAttempt(
+			"fetch",
+			status,
+			attemptStart,
+			nil,
+		)
 
 		return nil
 	}
@@ -345,10 +369,12 @@ func (c *Client) FetchListing(
 		)
 
 		if err != nil {
-			return ListingResponse{}, fmt.Errorf(
+			err = fmt.Errorf(
 				"reddit fetch listing: %w",
 				err,
 			)
+
+			return ListingResponse{}, err
 		}
 
 		return listing, nil
@@ -357,11 +383,14 @@ func (c *Client) FetchListing(
 	err = operation(ctx)
 
 	if err != nil {
-		return ListingResponse{}, fmt.Errorf(
+		err = fmt.Errorf(
 			"reddit fetch listing: %w",
 			err,
 		)
+
+		return ListingResponse{}, err
 	}
 
 	return listing, nil
+
 }

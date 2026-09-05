@@ -46,6 +46,24 @@ func TestMigrationsApplied(t *testing.T) {
 		)
 	})
 
+	t.Run("resources uses url instead of slug", func(t *testing.T) {
+		assertColumnExists(
+			t,
+			ctx,
+			db,
+			"resources",
+			"url",
+		)
+
+		assertColumnMissing(
+			t,
+			ctx,
+			db,
+			"resources",
+			"slug",
+		)
+	})
+
 	t.Run("external_items exists", func(t *testing.T) {
 		assertTableExists(
 			t,
@@ -170,5 +188,61 @@ SELECT EXISTS (
 
 	if !exists {
 		t.Fatalf("index %q does not exist", index)
+	}
+}
+
+func assertColumnExists(
+	t *testing.T,
+	ctx context.Context,
+	db *database.Database,
+	table string,
+	column string,
+) {
+	t.Helper()
+
+	const query = `
+SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema='public'
+      AND table_name=$1
+      AND column_name=$2
+)
+`
+
+	var exists bool
+	if err := db.Pool().QueryRow(ctx, query, table, column).Scan(&exists); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if !exists {
+		t.Fatalf("column %q.%q does not exist", table, column)
+	}
+}
+
+func assertColumnMissing(
+	t *testing.T,
+	ctx context.Context,
+	db *database.Database,
+	table string,
+	column string,
+) {
+	t.Helper()
+
+	const query = `
+SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema='public'
+      AND table_name=$1
+      AND column_name=$2
+)
+`
+
+	var exists bool
+	if err := db.Pool().QueryRow(ctx, query, table, column).Scan(&exists); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if exists {
+		t.Fatalf("column %q.%q unexpectedly exists", table, column)
 	}
 }

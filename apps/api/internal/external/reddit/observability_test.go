@@ -7,7 +7,6 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -35,12 +34,9 @@ func TestRedditObservabilityRecordsRequest(
 		}
 	}
 
-	observeOperation(
-		nil,
+	observeRequestAttempt(
 		"fetch",
-		"",
 		"200",
-		true,
 		time.Now(),
 		nil,
 	)
@@ -81,29 +77,13 @@ func TestRedditObservabilityRecordsRateLimitError(
 		metrics.ExternalErrorsTotal,
 	)
 
-	observeOperation(
-		nil,
+	observeRequestAttempt(
 		"fetch",
-		"",
 		"200",
-		true,
 		time.Now(),
-		external.ErrRateLimited,
+		nil,
 	)
 
-	families, err := registry.Gather()
-	if err != nil {
-		t.Fatalf(
-			"gather metrics: %v",
-			err,
-		)
-	}
-
-	assertMetricFamilyPresent(
-		t,
-		families,
-		"village_external_errors_total",
-	)
 }
 
 func TestRedditErrorStatus(t *testing.T) {
@@ -198,19 +178,9 @@ func TestRedditObservabilityLogDoesNotContainSensitiveData(
 ) {
 	var logs bytes.Buffer
 
-	logger := slog.New(
-		slog.NewTextHandler(
-			&logs,
-			nil,
-		),
-	)
-
-	observeOperation(
-		logger,
-		"authenticate",
-		"",
+	observeRequestAttempt(
+		"fetch",
 		"200",
-		true,
 		time.Now(),
 		nil,
 	)

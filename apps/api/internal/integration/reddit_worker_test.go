@@ -97,6 +97,7 @@ func TestRedditWorkerIntegration(t *testing.T) {
 	worker, err := reddit.NewIngestionWorker(
 		authenticator,
 		ingestion,
+		&integrationExternalItemRepository{},
 		reddit.WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,

@@ -1,0 +1,20 @@
+ three-attempt sequence is represented as:
+
+3 physical request metrics
+
+2 retry metrics
+
+2 physical request-error metrics when the first two attempts fail
+
+1 retry-exhausted metric only when the third/final at
+
+# 18.8 Structured logging review
+
+External integration logs use bounded fields: `source`, `operation`, `status`, `duration_ms`, `request_attempted`, optional `external_id`, and `error_type` on failure. Physical HTTP metrics remain separate from logical-operation logging, preventing retry double-counting.
+
+Application HTTP logs retain request correlation through `request_id`. Metrics never use request IDs, external IDs, tokens, URLs, or secrets as labels.
+
+## 18.9 Sensitive-data verification
+
+Automated tests verify that structured logs do not emit client secrets, access tokens, authorization headers, bearer tokens, passwords, or token query fragments.
+tempt also fails

@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/amyismebyme/the-village/apps/api/internal/cache"
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
@@ -116,8 +118,6 @@ func Run() error {
 	)
 
 	if cfg.Cache.Enabled {
-		var err error
-
 		memoryCache, err = cache.NewMemory(
 			cfg.Cache.MaxEntries,
 		)
@@ -136,10 +136,13 @@ func Run() error {
 				stats := memoryCache.Stats()
 
 				return metrics.CacheStats{
-					Entries:   stats.Entries,
-					Hits:      stats.Hits,
-					Misses:    stats.Misses,
-					Evictions: stats.Evictions,
+					Entries:     stats.Entries,
+					Hits:        stats.Hits,
+					Misses:      stats.Misses,
+					Evictions:   stats.Evictions,
+					Sets:        stats.Sets,
+					Deletes:     stats.Deletes,
+					Expirations: stats.Expirations,
 				}
 			},
 		); err != nil {
@@ -165,6 +168,11 @@ func Run() error {
 	//------------------------------------------------------------------
 
 	communityRepository := postgres.NewCommunityRepository(
+		db.Pool(),
+		cfg.Database.QueryTimeout,
+	)
+
+	externalItemRepository := postgres.NewExternalItemRepository(
 		db.Pool(),
 		cfg.Database.QueryTimeout,
 	)
@@ -219,6 +227,18 @@ func Run() error {
 		// -------------------------------------------------------------
 
 		rateLimiters := ratelimit.NewPerSource()
+
+		rateLimiters.SetObserver(func(
+			source external.Source,
+			waited time.Duration,
+			err error,
+		) {
+			metrics.ObserveRateLimiterWait(
+				string(source),
+				waited,
+				err,
+			)
+		})
 
 		redditLimiter, err := rateLimiters.Register(
 			external.SourceReddit,
@@ -317,6 +337,7 @@ func Run() error {
 		redditWorker, err := reddit.NewIngestionWorker(
 			redditAuthenticator,
 			redditIngestion,
+			externalItemRepository,
 			reddit.WorkerConfig{
 				Subreddit: cfg.Worker.Reddit.Subreddit,
 				Limit:     cfg.Worker.Reddit.Limit,

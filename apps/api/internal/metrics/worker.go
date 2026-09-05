@@ -13,6 +13,14 @@ var WorkerRunsTotal = prometheus.NewCounterVec(
 	},
 )
 
+var WorkerFailureTypesTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_worker_failures_by_type_total",
+		Help: "Total background worker failures by bounded failure type.",
+	},
+	[]string{"worker", "type"},
+)
+
 var WorkerFailuresTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "village_worker_failures_total",

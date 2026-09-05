@@ -7,6 +7,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"runtime"
+	"time"
+)
+
+var RateLimiterWaitsTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_rate_limiter_waits_total",
+		Help: "Total number of waits for an external rate limiter.",
+	},
+	[]string{"source"},
+)
+
+var RateLimiterWaitDuration = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name: "village_rate_limiter_wait_duration_seconds",
+		Help: "Time spent waiting for an external rate limiter.",
+	},
+	[]string{"source"},
 )
 
 var RequestsTotal = prometheus.NewCounterVec(
@@ -161,9 +178,12 @@ func Register(
 
 		ExternalRetriesTotal,
 		ExternalRetryDelay,
+		RateLimiterWaitsTotal,
+		RateLimiterWaitDuration,
 
 		WorkerRunsTotal,
 		WorkerFailuresTotal,
+		WorkerFailureTypesTotal,
 		WorkerDuration,
 		WorkersInFlight,
 	}
@@ -341,4 +361,20 @@ func (c *PoolCollector) Collect(ch chan<- prometheus.Metric) {
 		prometheus.GaugeValue,
 		float64(s.MaxConns()),
 	)
+}
+
+func ObserveRateLimiterWait(
+	source string,
+	waited time.Duration,
+	err error,
+) {
+	if waited > 0 {
+		RateLimiterWaitsTotal.
+			WithLabelValues(source).
+			Inc()
+
+		RateLimiterWaitDuration.
+			WithLabelValues(source).
+			Observe(waited.Seconds())
+	}
 }
