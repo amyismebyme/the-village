@@ -1,0 +1,58 @@
+groups:
+  - name: village.sprint18.failure-classification
+    interval: 30s
+    rules:
+      - record: village:external_error_rate5m
+        expr: |
+          sum by (source, operation, type) (rate(village_external_errors_total[5m]))
+
+      - record: village:external_retry_rate5m
+        expr: |
+          sum by (source, operation, error_type) (rate(village_external_retries_total[5m]))
+
+      - record: village:external_request_failure_ratio5m
+        expr: |
+          sum by (source, operation) (rate(village_external_errors_total[5m]))
+          /
+          sum by (source, operation) (rate(village_external_requests_total[5m]))
+
+      - record: village:external_retry_exhaustion_rate5m
+        expr: |
+          sum by (source, operation) (rate(village_external_retry_exhausted_total[5m]))
+
+      - record: village:external_rate_limiter_wait_p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (source, le) (rate(village_external_rate_limiter_wait_duration_seconds_bucket[5m]))
+          )
+
+      - record: village:cache_hit_ratio5m
+        expr: |
+          sum(rate(village_cache_hits_total[5m]))
+          /
+          clamp_min(
+            sum(rate(village_cache_hits_total[5m]))
+            + sum(rate(village_cache_misses_total[5m])),
+            1e-9
+          )
+
+      - record: village:worker_failure_ratio5m
+        expr: |
+          sum by (worker) (rate(village_worker_failures_total[5m]))
+          /
+          clamp_min(
+            sum by (worker) (rate(village_worker_runs_total{status=~"success|failure"}[5m])),
+            1e-9
+          )
+
+      - record: village:worker_failure_rate5m
+        expr: |
+          sum by (worker, type) (rate(village_worker_failures_by_type_total[5m]))
+
+      - record: village:worker_duration_p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (worker, le) (rate(village_worker_duration_seconds_bucket[5m]))
+          )

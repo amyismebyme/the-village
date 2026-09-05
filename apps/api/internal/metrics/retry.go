@@ -39,3 +39,14 @@ var ExternalRetryDelay = prometheus.NewHistogramVec(
 		"operation",
 	},
 )
+
+var ExternalRetryExhaustedTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "village_external_retry_exhausted_total",
+		Help: "Total outbound external operations that exhausted their retry budget.",
+	},
+	[]string{
+		"source",
+		"operation",
+	},
+)

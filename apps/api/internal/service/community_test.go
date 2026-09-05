@@ -460,6 +460,36 @@ func TestCreateCommunityMetricSuccess(t *testing.T) {
 	}
 }
 
+func TestCreateCommunityMetricFailureIncrementsFailure(t *testing.T) {
+	repo := newMockCommunityRepository()
+	repo.createErr = errors.New("database unavailable")
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("failure"),
+	)
+
+	err := svc.Create(
+		context.Background(),
+		&model.Community{
+			Name: "Toronto Men",
+			Slug: "toronto-men",
+		},
+	)
+	if err == nil {
+		t.Fatal("expected Create error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityCreateTotal.WithLabelValues("failure"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf("expected create failure metric +1, got %v", got)
+	}
+}
+
 func TestCreateCommunityMetricFailureDoesNotIncrementSuccess(
 	t *testing.T,
 ) {
@@ -543,6 +573,42 @@ func TestUpdateCommunityMetricSuccess(t *testing.T) {
 			"expected update metric +1, got %v",
 			got,
 		)
+	}
+}
+
+func TestUpdateCommunityMetricFailureIncrementsFailure(t *testing.T) {
+	repo := newMockCommunityRepository()
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+	repo.updateErr = errors.New("database unavailable")
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("failure"),
+	)
+
+	err := svc.Update(
+		context.Background(),
+		&model.Community{
+			ID:   1,
+			Name: "Toronto Men Updated",
+			Slug: "toronto-men-updated",
+		},
+	)
+	if err == nil {
+		t.Fatal("expected Update error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityUpdateTotal.WithLabelValues("failure"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf("expected update failure metric +1, got %v", got)
 	}
 }
 
@@ -666,6 +732,38 @@ func TestDeleteCommunityMetricNotFoundDoesNotIncrementSuccess(
 			"expected delete success metric unchanged, got %v",
 			got,
 		)
+	}
+}
+
+func TestDeleteCommunityMetricFailureIncrementsFailure(t *testing.T) {
+	repo := newMockCommunityRepository()
+	repo.communities[1] = &model.Community{
+		ID:   1,
+		Name: "Toronto Men",
+		Slug: "toronto-men",
+	}
+	repo.deleteErr = errors.New("database unavailable")
+
+	svc := NewCommunityService(repo)
+
+	before := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("failure"),
+	)
+
+	err := svc.Delete(
+		context.Background(),
+		1,
+	)
+	if err == nil {
+		t.Fatal("expected Delete error")
+	}
+
+	after := testutil.ToFloat64(
+		metrics.CommunityDeleteTotal.WithLabelValues("failure"),
+	)
+
+	if got := after - before; got != 1 {
+		t.Fatalf("expected delete failure metric +1, got %v", got)
 	}
 }
 

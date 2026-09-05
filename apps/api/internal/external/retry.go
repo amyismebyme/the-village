@@ -79,7 +79,19 @@ func (p *RetryPolicy) Do(
 		}
 
 		// The retry budget has been consumed.
+		// The retry budget has been consumed.
 		if attempt == p.MaxAttempts {
+			if observer != nil {
+				observer(
+					RetryEvent{
+						Attempt:     attempt,
+						NextAttempt: 0,
+						Delay:       0,
+						ErrorType:   string(ClassifyError(err)),
+					},
+				)
+			}
+
 			return &RetryExhaustedError{
 				Cause:    err,
 				Attempts: attempt,

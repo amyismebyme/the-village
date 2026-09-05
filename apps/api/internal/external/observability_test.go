@@ -13,6 +13,7 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/external/testutil"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestObserveOperationSuccess(t *testing.T) {
@@ -41,6 +42,14 @@ func TestObserveOperationSuccess(t *testing.T) {
 		Add(0)
 
 	start := time.Now()
+
+	ObserveRequestAttempt(
+		Source("test"),
+		"fetch",
+		"200",
+		start,
+		nil,
+	)
 
 	ObserveOperation(
 		logger,
@@ -101,6 +110,16 @@ func TestObserveOperationTimeout(t *testing.T) {
 		context.DeadlineExceeded,
 	)
 
+	start := time.Now()
+
+	ObserveRequestAttempt(
+		Source("test"),
+		"fetch",
+		"timeout",
+		start,
+		err,
+	)
+
 	ObserveOperation(
 		logger,
 		Source("test"),
@@ -108,7 +127,7 @@ func TestObserveOperationTimeout(t *testing.T) {
 		"external-timeout",
 		"timeout",
 		true,
-		time.Now(),
+		start,
 		err,
 	)
 
@@ -330,6 +349,14 @@ func TestObserveOperationRecordsRateLimitError(
 
 	start := time.Now()
 
+	ObserveRequestAttempt(
+		Source("reddit"),
+		"fetch",
+		"429",
+		start,
+		ErrRateLimited,
+	)
+
 	ObserveOperation(
 		nil,
 		Source("reddit"),
@@ -411,4 +438,120 @@ func TestObserveOperationRecordsRateLimitError(
 			"metric family village_external_errors_total not found",
 		)
 	}
+}
+
+func TestObserveRequestAttemptRecordsOnePhysicalRequest(t *testing.T) {
+	metrics.ExternalRequestsTotal.Reset()
+	metrics.ExternalRequestDuration.Reset()
+	metrics.ExternalErrorsTotal.Reset()
+
+	start := time.Now().Add(-5 * time.Millisecond)
+
+	ObserveRequestAttempt(
+		Source("reddit"),
+		"fetch",
+		"503",
+		start,
+		ErrUpstream,
+	)
+
+	if got := prometheusCounterValue(
+		t,
+		metrics.ExternalRequestsTotal.WithLabelValues(
+			"reddit",
+			"fetch",
+			"503",
+		),
+	); got != 1 {
+		t.Fatalf("expected one physical request, got %v", got)
+	}
+
+	if got := prometheusCounterValue(
+		t,
+		metrics.ExternalErrorsTotal.WithLabelValues(
+			"reddit",
+			"fetch",
+			"upstream",
+		),
+	); got != 1 {
+		t.Fatalf("expected one request error, got %v", got)
+	}
+
+	registry := prometheus.NewRegistry()
+	for _, collector := range []prometheus.Collector{
+		metrics.ExternalRequestsTotal,
+		metrics.ExternalRequestDuration,
+		metrics.ExternalErrorsTotal,
+	} {
+		if err := registry.Register(collector); err != nil {
+			t.Fatalf("register external collector: %v", err)
+		}
+	}
+
+	families, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("gather external metrics: %v", err)
+	}
+
+	var durationSamples uint64
+	for _, family := range families {
+		if family.GetName() != "village_external_request_duration_seconds" {
+			continue
+		}
+
+		for _, metric := range family.GetMetric() {
+			durationSamples += metric.GetHistogram().GetSampleCount()
+		}
+	}
+
+	if durationSamples != 1 {
+		t.Fatalf("expected one request duration sample, got %d", durationSamples)
+	}
+}
+
+func TestObserveOperationDoesNotDoubleCountPhysicalRequestMetrics(t *testing.T) {
+	metrics.ExternalRequestsTotal.Reset()
+	metrics.ExternalRequestDuration.Reset()
+	metrics.ExternalErrorsTotal.Reset()
+
+	start := time.Now().Add(-5 * time.Millisecond)
+
+	ObserveRequestAttempt(
+		Source("reddit"),
+		"fetch",
+		"200",
+		start,
+		nil,
+	)
+
+	ObserveOperation(
+		nil,
+		Source("reddit"),
+		"fetch",
+		"external-123",
+		"200",
+		true,
+		start,
+		nil,
+	)
+
+	if got := prometheusCounterValue(
+		t,
+		metrics.ExternalRequestsTotal.WithLabelValues(
+			"reddit",
+			"fetch",
+			"200",
+		),
+	); got != 1 {
+		t.Fatalf("expected one physical request metric, got %v", got)
+	}
+}
+
+func prometheusCounterValue(
+	t *testing.T,
+	counter prometheus.Counter,
+) float64 {
+	t.Helper()
+
+	return promtestutil.ToFloat64(counter)
 }

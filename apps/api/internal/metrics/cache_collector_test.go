@@ -11,10 +11,13 @@ func TestCacheCollectorReportsStats(
 	collector := NewCacheCollector(
 		func() CacheStats {
 			return CacheStats{
-				Entries:   3,
-				Hits:      10,
-				Misses:    4,
-				Evictions: 2,
+				Entries:     3,
+				Hits:        10,
+				Misses:      4,
+				Evictions:   2,
+				Sets:        7,
+				Deletes:     3,
+				Expirations: 1,
 			}
 		},
 	)
@@ -54,6 +57,27 @@ func TestCacheCollectorReportsStats(
 			stats.Evictions,
 		)
 	}
+
+	if stats.Sets != 7 {
+		t.Fatalf(
+			"expected 7 sets, got %d",
+			stats.Sets,
+		)
+	}
+
+	if stats.Deletes != 3 {
+		t.Fatalf(
+			"expected 3 deletes, got %d",
+			stats.Deletes,
+		)
+	}
+
+	if stats.Expirations != 1 {
+		t.Fatalf(
+			"expected 1 expiration, got %d",
+			stats.Expirations,
+		)
+	}
 }
 
 func TestCacheMetricsExposeExpectedFamilies(
@@ -64,10 +88,13 @@ func TestCacheMetricsExposeExpectedFamilies(
 	collector := NewCacheCollector(
 		func() CacheStats {
 			return CacheStats{
-				Entries:   2,
-				Hits:      5,
-				Misses:    3,
-				Evictions: 1,
+				Entries:     2,
+				Hits:        5,
+				Misses:      3,
+				Evictions:   1,
+				Sets:        4,
+				Deletes:     2,
+				Expirations: 3,
 			}
 		},
 	)
@@ -90,10 +117,13 @@ func TestCacheMetricsExposeExpectedFamilies(
 	}
 
 	expected := map[string]bool{
-		"village_cache_entries":         false,
-		"village_cache_hits_total":      false,
-		"village_cache_misses_total":    false,
-		"village_cache_evictions_total": false,
+		"village_cache_entries":           false,
+		"village_cache_hits_total":        false,
+		"village_cache_misses_total":      false,
+		"village_cache_evictions_total":   false,
+		"village_cache_sets_total":        false,
+		"village_cache_deletes_total":     false,
+		"village_cache_expirations_total": false,
 	}
 
 	for _, family := range families {

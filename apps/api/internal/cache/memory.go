@@ -18,9 +18,12 @@ type Memory struct {
 
 	now func() time.Time
 
-	hits      uint64
-	misses    uint64
-	evictions uint64
+	hits        uint64
+	misses      uint64
+	evictions   uint64
+	sets        uint64
+	deletes     uint64
+	expirations uint64
 }
 
 type entry struct {
@@ -30,11 +33,14 @@ type entry struct {
 }
 
 type Stats struct {
-	Entries   int
-	MaxItems  int
-	Hits      uint64
-	Misses    uint64
-	Evictions uint64
+	Entries     int
+	MaxItems    int
+	Hits        uint64
+	Misses      uint64
+	Evictions   uint64
+	Sets        uint64
+	Deletes     uint64
+	Expirations uint64
 }
 
 func NewMemory(
@@ -84,6 +90,7 @@ func (m *Memory) Get(
 		m.order.Remove(element)
 
 		m.misses++
+		m.expirations++
 
 		return nil, false, nil
 	}
@@ -137,6 +144,7 @@ func (m *Memory) Set(
 		}
 
 		m.order.MoveToFront(existing)
+		m.sets++
 
 		return nil
 	}
@@ -150,6 +158,7 @@ func (m *Memory) Set(
 	)
 
 	m.items[key] = element
+	m.sets++
 
 	if len(m.items) > m.maxEntries {
 		m.evictOldest()
@@ -178,6 +187,7 @@ func (m *Memory) Delete(
 	if element, ok := m.items[key]; ok {
 		delete(m.items, key)
 		m.order.Remove(element)
+		m.deletes++
 	}
 
 	return nil
@@ -204,11 +214,14 @@ func (m *Memory) Stats() Stats {
 	defer m.mu.Unlock()
 
 	return Stats{
-		Entries:   len(m.items),
-		MaxItems:  m.maxEntries,
-		Hits:      m.hits,
-		Misses:    m.misses,
-		Evictions: m.evictions,
+		Entries:     len(m.items),
+		MaxItems:    m.maxEntries,
+		Hits:        m.hits,
+		Misses:      m.misses,
+		Evictions:   m.evictions,
+		Sets:        m.sets,
+		Deletes:     m.deletes,
+		Expirations: m.expirations,
 	}
 }
 

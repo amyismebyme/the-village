@@ -5,10 +5,77 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/external"
 )
+
+type testExternalItemRepository struct{}
+
+type capturingExternalItemRepository struct {
+	mu    sync.Mutex
+	items []external.Item
+}
+
+func (r *capturingExternalItemRepository) Upsert(
+	context.Context,
+	external.Item,
+) error {
+	return nil
+}
+
+func (r *capturingExternalItemRepository) UpsertBatch(
+	_ context.Context,
+	items []external.Item,
+) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.items = append(r.items, items...)
+	return nil
+}
+
+func (r *capturingExternalItemRepository) FindByIdentity(
+	context.Context,
+	external.Identity,
+) (*external.Item, error) {
+	return nil, nil
+}
+
+func (r *capturingExternalItemRepository) DeleteAll(
+	context.Context,
+) error {
+	return nil
+}
+
+func (testExternalItemRepository) Upsert(
+	context.Context,
+	external.Item,
+) error {
+	return nil
+}
+
+func (testExternalItemRepository) UpsertBatch(
+	context.Context,
+	[]external.Item,
+) error {
+	return nil
+}
+
+func (testExternalItemRepository) FindByIdentity(
+	context.Context,
+	external.Identity,
+) (*external.Item, error) {
+	return nil, nil
+}
+
+func (testExternalItemRepository) DeleteAll(
+	context.Context,
+) error {
+	return nil
+}
 
 func TestIngestionWorkerRunsRedditIngestion(
 	t *testing.T,
@@ -114,6 +181,7 @@ func TestIngestionWorkerRunsRedditIngestion(
 	redditWorker, err := NewIngestionWorker(
 		authenticator,
 		ingestion,
+		testExternalItemRepository{},
 		WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,
@@ -273,6 +341,7 @@ func TestIngestionWorkerRecoversAfterTemporaryFailure(
 	redditWorker, err := NewIngestionWorker(
 		authenticator,
 		ingestion,
+		testExternalItemRepository{},
 		WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,
@@ -335,5 +404,53 @@ func TestIngestionWorkerRecoversAfterTemporaryFailure(
 		t.Fatal(
 			"worker did not stop",
 		)
+	}
+}
+
+func TestIngestionWorkerPersistsNormalizedItems(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/access_token":
+			_, _ = w.Write([]byte(`{"access_token":"test-token","token_type":"bearer","expires_in":3600,"scope":"*"}`))
+		case "/r/toronto/new":
+			_, _ = w.Write([]byte(`{"data":{"after":null,"before":null,"children":[{"kind":"t3","data":{"id":"persist-123","title":"Persist me"}}]}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	authenticator, err := NewAuthenticator(server.Client(), server.URL, "client-id", "client-secret", "the-village/test", time.Second)
+	if err != nil {
+		t.Fatalf("create authenticator: %v", err)
+	}
+
+	client, err := NewClient(server.Client(), server.URL, "the-village/test", time.Second)
+	if err != nil {
+		t.Fatalf("create client: %v", err)
+	}
+
+	ingestion := NewIngestionService(client, NewPostNormalizer())
+	repo := &capturingExternalItemRepository{}
+
+	worker, err := NewIngestionWorker(authenticator, ingestion, repo, WorkerConfig{Subreddit: "toronto", Limit: 10, Interval: time.Hour})
+	if err != nil {
+		t.Fatalf("create worker: %v", err)
+	}
+
+	if err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	if len(repo.items) != 1 {
+		t.Fatalf("expected one persisted item, got %d", len(repo.items))
+	}
+
+	if repo.items[0].ExternalID != "persist-123" {
+		t.Fatalf("expected persisted external ID persist-123, got %q", repo.items[0].ExternalID)
 	}
 }

@@ -9,8 +9,12 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 )
 
-// ObserveOperation records the bounded Prometheus metrics and the
-// corresponding structured log for one external operation.
+// ObserveOperation records the logical external operation and its
+// corresponding structured log.
+//
+// Physical HTTP request metrics are recorded by ObserveRequestAttempt.
+// Keeping those responsibilities separate prevents retry attempts from
+// being double-counted.
 //
 // Metrics intentionally do not contain external_id or request_id.
 // Those belong in logs, where they are useful for correlation but
@@ -28,35 +32,6 @@ func ObserveOperation(
 	duration := time.Since(start)
 	errorClass := ClassifyError(err)
 
-	if requestAttempted {
-		metrics.ExternalRequestsTotal.
-			WithLabelValues(
-				string(source),
-				operation,
-				status,
-			).
-			Inc()
-
-		metrics.ExternalRequestDuration.
-			WithLabelValues(
-				string(source),
-				operation,
-			).
-			Observe(
-				duration.Seconds(),
-			)
-
-		if err != nil {
-			metrics.ExternalErrorsTotal.
-				WithLabelValues(
-					string(source),
-					operation,
-					string(errorClass),
-				).
-				Inc()
-		}
-	}
-
 	if logger == nil {
 		return
 	}
@@ -70,6 +45,8 @@ func ObserveOperation(
 		status,
 		"duration_ms",
 		duration.Milliseconds(),
+		"request_attempted",
+		requestAttempted,
 	}
 
 	if externalID != "" {
@@ -101,4 +78,52 @@ func ObserveOperation(
 		"external integration operation completed",
 		args...,
 	)
+}
+
+// ObserveRequestAttempt records metrics for one physical external
+// request attempt.
+//
+// This function is intentionally the sole owner of:
+//
+//   - ExternalRequestsTotal
+//   - ExternalRequestDuration
+//   - ExternalErrorsTotal
+//
+// Retry attempts therefore produce one set of physical-request metrics
+// each, while ObserveOperation remains a logical-operation observer.
+func ObserveRequestAttempt(
+	source Source,
+	operation string,
+	status string,
+	start time.Time,
+	err error,
+) {
+	metrics.ExternalRequestsTotal.
+		WithLabelValues(
+			string(source),
+			operation,
+			status,
+		).
+		Inc()
+
+	metrics.ExternalRequestDuration.
+		WithLabelValues(
+			string(source),
+			operation,
+		).
+		Observe(
+			time.Since(start).Seconds(),
+		)
+
+	if err == nil {
+		return
+	}
+
+	metrics.ExternalErrorsTotal.
+		WithLabelValues(
+			string(source),
+			operation,
+			string(ClassifyError(err)),
+		).
+		Inc()
 }

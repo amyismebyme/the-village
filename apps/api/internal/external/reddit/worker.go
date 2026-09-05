@@ -9,15 +9,17 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
+	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/worker"
 )
 
 const workerName = "reddit_ingestion"
 
 type IngestionWorker struct {
-	authenticator *Authenticator
-	ingestion     *IngestionService
-	scheduler     *worker.Scheduler
+	authenticator  *Authenticator
+	ingestion      *IngestionService
+	itemRepository repository.ExternalItemRepository
+	scheduler      *worker.Scheduler
 
 	subreddit string
 	limit     int
@@ -36,6 +38,7 @@ type WorkerConfig struct {
 func NewIngestionWorker(
 	authenticator *Authenticator,
 	ingestion *IngestionService,
+	itemRepository repository.ExternalItemRepository,
 	config WorkerConfig,
 ) (*IngestionWorker, error) {
 	if authenticator == nil {
@@ -47,6 +50,12 @@ func NewIngestionWorker(
 	if ingestion == nil {
 		return nil, errors.New(
 			"reddit worker: ingestion service is required",
+		)
+	}
+
+	if itemRepository == nil {
+		return nil, errors.New(
+			"reddit worker: item repository is required",
 		)
 	}
 
@@ -67,12 +76,13 @@ func NewIngestionWorker(
 	}
 
 	return &IngestionWorker{
-		authenticator: authenticator,
-		ingestion:     ingestion,
-		scheduler:     scheduler,
-		subreddit:     config.Subreddit,
-		limit:         config.Limit,
-		after:         config.After,
+		authenticator:  authenticator,
+		ingestion:      ingestion,
+		itemRepository: itemRepository,
+		scheduler:      scheduler,
+		subreddit:      config.Subreddit,
+		limit:          config.Limit,
+		after:          config.After,
 	}, nil
 }
 
@@ -93,10 +103,6 @@ func (w *IngestionWorker) Run(
 }
 
 // RunOnce executes exactly one ingestion cycle.
-//
-// It is intentionally independent of the scheduler so integration tests
-// and future administrative/manual execution can exercise one worker run
-// deterministically.
 func (w *IngestionWorker) RunOnce(
 	ctx context.Context,
 ) error {
@@ -117,7 +123,8 @@ func (w *IngestionWorker) handleFailure(
 		"operation",
 		"ingest",
 		"error_type",
-		string(external.ClassifyError(err)))
+		string(external.ClassifyError(err)),
+	)
 }
 
 func (w *IngestionWorker) runOnce(
@@ -138,8 +145,8 @@ func (w *IngestionWorker) runOnce(
 	status := "success"
 
 	if err != nil {
-		// Cancellation caused by worker shutdown is normal termination,
-		// not a failed worker execution.
+		// Worker shutdown cancellation is normal termination and should
+		// not be counted as a worker failure.
 		if errors.Is(err, context.Canceled) &&
 			errors.Is(ctx.Err(), context.Canceled) {
 			return err
@@ -149,6 +156,13 @@ func (w *IngestionWorker) runOnce(
 
 		metrics.WorkerFailuresTotal.
 			WithLabelValues(workerName).
+			Inc()
+
+		metrics.WorkerFailureTypesTotal.
+			WithLabelValues(
+				workerName,
+				string(external.ClassifyError(err)),
+			).
 			Inc()
 	}
 
@@ -183,7 +197,7 @@ func (w *IngestionWorker) runOnceInternal(
 		)
 	}
 
-	_, err = w.ingestion.IngestListing(
+	items, err := w.ingestion.IngestListing(
 		ctx,
 		token,
 		w.subreddit,
@@ -193,6 +207,20 @@ func (w *IngestionWorker) runOnceInternal(
 	if err != nil {
 		return fmt.Errorf(
 			"reddit worker: ingest listing: %w",
+			err,
+		)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if err := w.itemRepository.UpsertBatch(
+		ctx,
+		items,
+	); err != nil {
+		return fmt.Errorf(
+			"reddit worker: persist ingested items: %w",
 			err,
 		)
 	}

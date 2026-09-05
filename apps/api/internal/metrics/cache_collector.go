@@ -7,10 +7,13 @@ import (
 )
 
 type CacheStats struct {
-	Entries   int
-	Hits      uint64
-	Misses    uint64
-	Evictions uint64
+	Entries     int
+	Hits        uint64
+	Misses      uint64
+	Evictions   uint64
+	Sets        uint64
+	Deletes     uint64
+	Expirations uint64
 }
 
 type CacheStatsProvider func() CacheStats
@@ -18,10 +21,13 @@ type CacheStatsProvider func() CacheStats
 type CacheCollector struct {
 	provider CacheStatsProvider
 
-	entries   *prometheus.Desc
-	hits      *prometheus.Desc
-	misses    *prometheus.Desc
-	evictions *prometheus.Desc
+	entries     *prometheus.Desc
+	hits        *prometheus.Desc
+	misses      *prometheus.Desc
+	evictions   *prometheus.Desc
+	sets        *prometheus.Desc
+	deletes     *prometheus.Desc
+	expirations *prometheus.Desc
 }
 
 func NewCacheCollector(
@@ -51,6 +57,27 @@ func NewCacheCollector(
 			nil,
 		),
 
+		sets: prometheus.NewDesc(
+			"village_cache_sets_total",
+			"Total cache set operations.",
+			nil,
+			nil,
+		),
+
+		deletes: prometheus.NewDesc(
+			"village_cache_deletes_total",
+			"Total cache delete operations that removed an entry.",
+			nil,
+			nil,
+		),
+
+		expirations: prometheus.NewDesc(
+			"village_cache_expirations_total",
+			"Total cache entries found expired during access.",
+			nil,
+			nil,
+		),
+
 		evictions: prometheus.NewDesc(
 			"village_cache_evictions_total",
 			"Total cache entries evicted due to capacity limits.",
@@ -67,6 +94,9 @@ func (c *CacheCollector) Describe(
 	ch <- c.hits
 	ch <- c.misses
 	ch <- c.evictions
+	ch <- c.sets
+	ch <- c.deletes
+	ch <- c.expirations
 }
 
 func (c *CacheCollector) Collect(
@@ -96,6 +126,24 @@ func (c *CacheCollector) Collect(
 		c.evictions,
 		prometheus.CounterValue,
 		float64(stats.Evictions),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.sets,
+		prometheus.CounterValue,
+		float64(stats.Sets),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.deletes,
+		prometheus.CounterValue,
+		float64(stats.Deletes),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.expirations,
+		prometheus.CounterValue,
+		float64(stats.Expirations),
 	)
 }
 

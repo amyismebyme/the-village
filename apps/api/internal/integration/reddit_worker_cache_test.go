@@ -142,6 +142,7 @@ func TestRedditWorkerUsesCacheAcrossRuns(
 	redditWorker, err := reddit.NewIngestionWorker(
 		authenticator,
 		ingestion,
+		&integrationExternalItemRepository{},
 		reddit.WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,

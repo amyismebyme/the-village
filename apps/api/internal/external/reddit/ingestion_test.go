@@ -362,6 +362,7 @@ func TestNewIngestionWorkerRejectsInvalidConfiguration(
 			_, err := NewIngestionWorker(
 				authenticator,
 				ingestion,
+				testExternalItemRepository{},
 				tt.config,
 			)
 
