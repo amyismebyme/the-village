@@ -166,7 +166,7 @@ func TestRedditWorkerRecoversAfterDependencyRestoration(
 		reddit.WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,
-			Interval:  time.Hour,
+			Interval:  time.Millisecond,
 		},
 	)
 	if err != nil {

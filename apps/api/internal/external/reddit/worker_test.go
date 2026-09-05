@@ -185,7 +185,7 @@ func TestIngestionWorkerRunsRedditIngestion(
 		WorkerConfig{
 			Subreddit: "toronto",
 			Limit:     10,
-			Interval:  time.Hour,
+			Interval:  10 * time.Millisecond,
 		},
 	)
 	if err != nil {
