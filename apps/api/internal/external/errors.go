@@ -196,35 +196,3 @@ func IsPermanent(err error) bool {
 		return false
 	}
 }
-
-func IsRateLimited(err error) bool {
-	return errors.Is(err, ErrRateLimited)
-}
-
-func IsTimeout(err error) bool {
-	return errors.Is(err, ErrTimeout)
-}
-
-func IsUnauthorized(err error) bool {
-	return errors.Is(err, ErrUnauthorized)
-}
-
-func IsForbidden(err error) bool {
-	return errors.Is(err, ErrForbidden)
-}
-
-func IsNotFound(err error) bool {
-	return errors.Is(err, ErrNotFound)
-}
-
-func IsInvalidPayload(err error) bool {
-	return errors.Is(err, ErrInvalidPayload)
-}
-
-func IsInvalidConfig(err error) bool {
-	return errors.Is(err, ErrInvalidConfig)
-}
-
-func IsUpstream(err error) bool {
-	return errors.Is(err, ErrUpstream)
-}

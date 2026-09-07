@@ -34,18 +34,20 @@ The project currently contains a working Go API foundation and a partially imple
 - Community domain model
 - Community validation
 - Community service interface and initial unit tests
-- PostgreSQL Community repository skeleton
+- PostgreSQL Community repository
 
 ### Not yet implemented
 
 - Community HTTP CRUD endpoints
 - Complete Community PostgreSQL CRUD implementation
 - Resource repository CRUD implementation
+- External-item persistence with source/external-ID idempotency
+- Reddit ingestion worker persistence wiring
 - Authentication and authorization
 - User/member domain
 - Frontend/UI application
 - OpenAPI specification
-- CI workflows in the checked ZIP
+- CI workflows for build, test, race, lint, integration, and vulnerability verification
 - Kubernetes, Terraform, Grafana dashboards, Loki, and OpenTelemetry
 
 ## Repository layout

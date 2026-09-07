@@ -2,14 +2,14 @@ package reddit
 
 import (
 	"context"
+	"errors"
+	"github.com/amyismebyme/the-village/apps/api/internal/cache"
+	"github.com/amyismebyme/the-village/apps/api/internal/external"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/amyismebyme/the-village/apps/api/internal/cache"
-	"github.com/amyismebyme/the-village/apps/api/internal/external"
 )
 
 func TestIngestListingDoesNotServeExpiredCacheOnSourceFailure(
@@ -127,7 +127,7 @@ func TestIngestListingDoesNotServeExpiredCacheOnSourceFailure(
 		)
 	}
 
-	if !external.IsUpstream(err) {
+	if !errors.Is(err, external.ErrUpstream) {
 		t.Fatalf(
 			"expected upstream failure, got %v",
 			err,

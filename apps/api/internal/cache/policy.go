@@ -10,13 +10,6 @@ type TTLPolicy struct {
 	Community     time.Duration
 }
 
-func DefaultTTLPolicy() TTLPolicy {
-	return TTLPolicy{
-		RedditListing: 2 * time.Minute,
-		Community:     5 * time.Minute,
-	}
-}
-
 func (p TTLPolicy) Validate() error {
 	if p.RedditListing <= 0 {
 		return errors.New(

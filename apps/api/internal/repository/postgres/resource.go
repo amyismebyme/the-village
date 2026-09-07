@@ -69,31 +69,10 @@ ORDER BY id;
 	if err != nil {
 		return nil, translateError(err)
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var resource model.Resource
-
-		if err := rows.Scan(
-			&resource.ID,
-			&resource.Title,
-			&resource.Description,
-			&resource.URL,
-			&resource.Category,
-			&resource.CreatedAt,
-			&resource.UpdatedAt,
-		); err != nil {
-			return nil, translateError(err)
-		}
-
-		resources = append(
-			resources,
-			resource,
-		)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, translateError(err)
+	resources, err = scanResources(rows)
+	if err != nil {
+		return nil, err
 	}
 
 	if resources == nil {
@@ -133,35 +112,18 @@ func (r *ResourceRepository) FindByID(
 
 	const query = `
 SELECT
-	id,
-	title,
-	description,
-	url,
-	category,
-	created_at,
-	updated_at
+` + resourceColumns + `
 FROM resources
 WHERE id = $1;
 `
 
-	resource = &model.Resource{}
-
-	err = r.Pool().
-		QueryRow(
+	resource, err = scanResource(
+		r.Pool().QueryRow(
 			ctx,
 			query,
 			id,
-		).
-		Scan(
-			&resource.ID,
-			&resource.Title,
-			&resource.Description,
-			&resource.URL,
-			&resource.Category,
-			&resource.CreatedAt,
-			&resource.UpdatedAt,
-		)
-
+		),
+	)
 	if err != nil {
 		return nil, translateError(err)
 	}

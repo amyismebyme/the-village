@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 	"os"
 	"strings"
+
+	"github.com/amyismebyme/the-village/apps/api/internal/httputil"
 )
 
 // Validates params at application startup time and exits if not matching
@@ -160,7 +161,8 @@ func validateHTTPSURL(
 		false,
 	); err != nil {
 		return fmt.Errorf(
-			"REDDIT_BASE_URL is invalid: %w",
+			"%s is invalid: %w",
+			name,
 			err,
 		)
 	}

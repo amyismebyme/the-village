@@ -60,7 +60,7 @@ Current integration coverage:
 - expected migration tables
 - health endpoint through the real router and database checker
 
-The Community repository CRUD test exists but is skipped because repository methods are not complete.
+The Community repository CRUD tests cover the current repository implementation.
 
 Run manually from `apps/api` after starting the integration database and applying migrations:
 
@@ -94,12 +94,12 @@ Recommended future approach:
 ## Current test gaps
 
 - Community repository CRUD is skipped.
-- Resource repository has no real integration coverage.
+- Resource repository integration coverage should continue to expand as new repository behavior is introduced.
 - Community service tests do not currently test all error propagation paths.
 - No router tests for method handling or unknown paths.
 - No tests for configuration parse failures because invalid values silently default.
 - No frontend tests.
-- No CI workflow in the reviewed ZIP.
+- Live Reddit smoke tests are opt-in and are not part of ordinary CI because they require external credentials.
 
 ## Required Community vertical-slice tests
 
@@ -153,6 +153,7 @@ go test ./...
 go vet ./...
 go test -race ./...
 golangci-lint run
+go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 ```
 
 The current `go 1.26.5` directive may prevent these commands on environments that cannot obtain that toolchain. Pin to an intentionally supported Go version and document it.

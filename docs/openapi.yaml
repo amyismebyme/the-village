@@ -93,7 +93,7 @@ paths:
                 status: running
                 version: 0.1.2
                 build_date: '2026-08-20T00:00:00Z'
-                go_version: go1.26.5
+                go_version: go1.26.6
                 uptime: 1h23m45s
                 started_at: '2026-08-20T00:00:00Z'
                 git_commit: local
@@ -690,7 +690,7 @@ components:
 
         go_version:
           type: string
-          example: go1.26.5
+          example: go1.26.6
 
         uptime:
           type: string

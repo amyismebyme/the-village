@@ -32,4 +32,4 @@ Docker builds inject version, git commit, build timestamp, and environment using
 
 ## Corporate CA
 
-`zscaler.crt` is no longer required for Docker builds. When needed, provide it as a BuildKit secret. It is not copied into the runtime image.
+`zscaler.crt` remains a local build dependency in the current Dockerfile. Removing that dependency is intentionally deferred; the certificate is not copied into the runtime image.

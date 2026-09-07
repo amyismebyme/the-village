@@ -1,0 +1,30 @@
+# Sprint 19 P2 Cleanup Patch
+
+Based on the latest attached repository archive.
+
+Changes:
+- Removed genuinely unreferenced exported helper APIs:
+  - external.IsRateLimited
+  - external.IsTimeout
+  - external.IsUnauthorized
+  - external.IsForbidden
+  - external.IsNotFound
+  - external.IsInvalidPayload
+  - external.IsInvalidConfig
+  - external.IsUpstream (tests now use errors.Is directly)
+  - external.SameIdentity
+  - cache.DefaultTTLPolicy
+  - worker.ClassifyFailure and its unused failure.go file
+- Centralized repeated PostgreSQL projection lists in postgres/helpers.go.
+- Added resource row-list scanning helper.
+- Centralized external_items projection/write columns.
+- Updated affected tests to use errors.Is directly.
+- Formatted ingestion benchmark and affected Go files with gofmt.
+
+No migrations, API routes, Docker behavior, or runtime configuration were changed.
+
+Validation completed in the available environment:
+- all internal Go files are gofmt-clean.
+- zero remaining repo references to the removed helper symbols.
+
+The project declares Go 1.26.6; the available sandbox toolchain is Go 1.23.2 and cannot download Go 1.26.6, so the full test suite could not be executed here.
