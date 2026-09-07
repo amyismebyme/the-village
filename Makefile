@@ -32,6 +32,9 @@ TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 .PHONY: clean
 .PHONY: build-release
 .PHONY: verify-build-metadata
+.PHONY: vulncheck
+.PHONY: reddit-live-smoke
+.PHONY: verify-milestone19
 
 .DEFAULT_GOAL := help
 
@@ -144,3 +147,13 @@ verify-build-metadata:
 		-run '^TestInjectedBuildMetadata$$' \
 		-count=1 \
 		-ldflags="-X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$(git rev-parse HEAD 2>/dev/null || echo local) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production"
+
+vulncheck:
+	cd $(API_DIR) && $(GO) run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+verify-milestone19:
+	@$(SHELL) scripts/verify-milestone19.sh
+
+
+reddit-live-smoke:
+	@./scripts/reddit-live-smoke.sh

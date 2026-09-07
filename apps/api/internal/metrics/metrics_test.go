@@ -22,7 +22,7 @@ func TestBuildInfoMetric(t *testing.T) {
 	BuildInfo.With(prometheus.Labels{
 		"environment": "dev",
 		"git_commit":  "local",
-		"go_version":  "go1.26.5",
+		"go_version":  "go1.26.6",
 		"version":     "0.7.8",
 	}).Set(1)
 
@@ -69,7 +69,7 @@ func TestBuildInfoMetric(t *testing.T) {
 		expectedLabels := map[string]string{
 			"environment": "dev",
 			"git_commit":  "local",
-			"go_version":  "go1.26.5",
+			"go_version":  "go1.26.6",
 			"version":     "0.7.8",
 		}
 

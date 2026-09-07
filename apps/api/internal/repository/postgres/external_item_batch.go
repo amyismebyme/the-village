@@ -66,12 +66,7 @@ func (r *ExternalItemRepository) UpsertBatch(
 
 	const query = `
 INSERT INTO external_items
-(
-	source,
-	external_id,
-	title,
-	description,
-	url
+(` + externalItemColumns + `
 )
 VALUES
 (

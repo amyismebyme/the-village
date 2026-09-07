@@ -2,15 +2,15 @@ package integration
 
 import (
 	"context"
-	"net/http"
-	"sync"
-	"testing"
-	"time"
-
+	"errors"
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
 	"github.com/amyismebyme/the-village/apps/api/internal/external/ratelimit"
 	"github.com/amyismebyme/the-village/apps/api/internal/external/reddit"
 	"github.com/amyismebyme/the-village/apps/api/internal/external/testutil"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
 )
 
 func TestRedditWorkerFailureThenRecovery(
@@ -174,7 +174,7 @@ func TestRedditWorkerFailureThenRecovery(
 		)
 	}
 
-	if !external.IsUpstream(err) {
+	if !errors.Is(err, external.ErrUpstream) {
 		t.Fatalf(
 			"expected upstream error, got %v",
 			err,

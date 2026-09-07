@@ -51,7 +51,7 @@ Current note: `dependencies.go` defines a `Dependencies` struct but the applicat
 
 Loads environment variables into a typed configuration object and validates application-level settings.
 
-The database configuration is currently validated separately in `app.Run`. Consolidating this into `config.Validate` would provide a single startup validation path.
+The database configuration is currently validated separately in `app.Run`; this remains a deliberate boundary until startup configuration validation is consolidated.
 
 ### `internal/database`
 
@@ -106,7 +106,7 @@ Defines persistence interfaces and shared repository errors.
 
 Contains concrete PostgreSQL implementations and a shared embedded `Repository` that exposes the pool.
 
-The Community and Resource implementations are currently incomplete.
+The Community and Resource PostgreSQL implementations are implemented for the current persistence surface. External Reddit items persist through the provider-neutral `ExternalItemRepository`; Resource HTTP/service routes remain future product work.
 
 ### `internal/metrics`
 

@@ -62,12 +62,7 @@ func (r *ExternalItemRepository) Upsert(
 
 	const query = `
 INSERT INTO external_items
-(
-	source,
-	external_id,
-	title,
-	description,
-	url
+(` + externalItemColumns + `
 )
 VALUES
 (
@@ -152,11 +147,7 @@ func (r *ExternalItemRepository) FindByIdentity(
 
 	const query = `
 SELECT
-	source,
-	external_id,
-	title,
-	description,
-	url
+` + externalItemColumns + `
 FROM external_items
 WHERE source = $1
   AND external_id = $2;

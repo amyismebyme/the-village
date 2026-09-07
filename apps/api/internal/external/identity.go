@@ -48,17 +48,6 @@ func (i Identity) Key() string {
 	)
 }
 
-func SameIdentity(
-	left Identity,
-	right Identity,
-) bool {
-	left = left.Normalize()
-	right = right.Normalize()
-
-	return left.Source == right.Source &&
-		left.ExternalID == right.ExternalID
-}
-
 // ValidateUniqueIdentities performs strict duplicate detection.
 //
 // This is useful when a caller wants duplicates to be treated as an error.

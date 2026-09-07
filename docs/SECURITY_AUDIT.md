@@ -34,3 +34,7 @@ Unexpected repository/database errors are mapped to the stable `internal_error` 
 ## Automated checks
 
 The production verification script searches logging code for sensitive terms and verifies the known metric-label contract through the integration suite.
+
+## Dependency vulnerability verification
+
+Milestone verification runs `go mod verify` and `go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...` to identify known vulnerabilities that affect the code paths being scanned. The tool uses the Go vulnerability database.

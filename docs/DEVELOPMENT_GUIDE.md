@@ -168,3 +168,22 @@ go test ./...
 go test -race ./...
 go vet ./...
 golangci-lint run
+## Milestone verification commands
+
+Run the standard quality gate with:
+
+```bash
+make verify-milestone19
+```
+
+Run the opt-in live Reddit smoke test only when Reddit credentials are intentionally available in the environment:
+
+```bash
+./scripts/reddit-live-smoke.sh toronto
+```
+
+Windows:
+
+```powershell
+.\scripts\reddit-live-smoke.ps1 -Subreddit toronto
+```

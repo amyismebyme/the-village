@@ -53,13 +53,7 @@ func (r *CommunityRepository) List(
 
 	const query = `
 SELECT
-    id,
-    name,
-    slug,
-    description,
-    external_source,
-    created_at,
-    updated_at
+` + communityColumns + `
 FROM communities
 ORDER BY name, id
 LIMIT $1 OFFSET $2;
@@ -101,13 +95,7 @@ func (r *CommunityRepository) FindByID(
 	defer cancel()
 	const query = `
 SELECT
-	id,
-	name,
-	slug,
-	description,
-	external_source,
-	created_at,
-	updated_at
+` + communityColumns + `
 FROM communities
 WHERE id=$1;
 `
@@ -276,13 +264,7 @@ func (r *CommunityRepository) FindBySlug(
 	defer cancel()
 	const query = `
 SELECT
-	id,
-	name,
-	slug,
-	description,
-	external_source,
-	created_at,
-	updated_at
+` + communityColumns + `
 FROM communities
 WHERE slug=$1;
 `
