@@ -23,7 +23,8 @@ func Logging(
 
 		duration := time.Since(start)
 
-		logger.Info(
+		logger.InfoContext(
+			r.Context(),
 			"http request completed",
 			"request_id", GetRequestID(r.Context()),
 			"method", r.Method,

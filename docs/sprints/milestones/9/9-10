@@ -1,0 +1,8 @@
+9.9 Trace/log correlation
+
+Structured JSON logs now receive trace_id and span_id automatically when emitted with a context containing a valid OpenTelemetry span. Request, handler, and Reddit operation/retry logs use InfoContext/WarnContext/ErrorContext so the correlation survives across the traced call chain.
+
+The logger depends only on the OpenTelemetry API, not on Tempo/Loki/exporter implementations.
+
+
+The development Compose stack adds Loki, Tempo, and Alertmanager with persistent named volumes. Grafana provisions Prometheus, Loki, and Tempo datasources. Tempo accepts OTLP/gRPC and OTLP/HTTP on the Docker network. Loki stores data under /loki; Tempo uses local trace block/WAL storage under /data/tempo.

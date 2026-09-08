@@ -11,6 +11,9 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/worker"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const workerName = "reddit_ingestion"
@@ -184,7 +187,21 @@ func (w *IngestionWorker) runOnce(
 
 func (w *IngestionWorker) runOnceInternal(
 	ctx context.Context,
-) error {
+) (err error) {
+	ctx, span := otel.Tracer(tracerName).Start(ctx, "reddit.ingest")
+	span.SetAttributes(
+		attribute.String("source", string(external.SourceReddit)),
+		attribute.String("operation", "ingest"),
+		attribute.String("subreddit", w.subreddit),
+	)
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "reddit ingestion failed")
+		}
+		span.End()
+	}()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -215,15 +232,30 @@ func (w *IngestionWorker) runOnceInternal(
 		return err
 	}
 
-	if err := w.itemRepository.UpsertBatch(
+	persistCtx, persistSpan := otel.Tracer(tracerName).Start(
 		ctx,
+		"external_item.upsert_batch",
+	)
+	persistSpan.SetAttributes(
+		attribute.String("source", string(external.SourceReddit)),
+		attribute.String("operation", "upsert_batch"),
+	)
+
+	if err := w.itemRepository.UpsertBatch(
+		persistCtx,
 		items,
 	); err != nil {
+		persistSpan.RecordError(err)
+		persistSpan.SetStatus(codes.Error, "external item persistence failed")
+		persistSpan.End()
+
 		return fmt.Errorf(
 			"reddit worker: persist ingested items: %w",
 			err,
 		)
 	}
+
+	persistSpan.End()
 
 	return nil
 }

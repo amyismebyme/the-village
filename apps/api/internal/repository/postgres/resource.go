@@ -33,6 +33,8 @@ func (r *ResourceRepository) List(
 	ctx context.Context,
 ) (resources []model.Resource, err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "resource_list")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -87,6 +89,8 @@ func (r *ResourceRepository) FindByID(
 	id int64,
 ) (resource *model.Resource, err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "resource_find_by_id")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -136,6 +140,8 @@ func (r *ResourceRepository) Create(
 	resource *model.Resource,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "resource_create")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -204,6 +210,8 @@ func (r *ResourceRepository) Update(
 	resource *model.Resource,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "resource_update")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -267,6 +275,8 @@ func (r *ResourceRepository) Delete(
 	id int64,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "resource_delete")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -315,6 +325,8 @@ func (r *ResourceRepository) DeleteAll(
 	ctx context.Context,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "resource_delete_all")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(

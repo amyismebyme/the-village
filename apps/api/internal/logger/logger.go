@@ -35,5 +35,5 @@ func New(cfg config.Config) *slog.Logger {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 
-	return slog.New(handler)
+	return slog.New(newTraceHandler(handler))
 }

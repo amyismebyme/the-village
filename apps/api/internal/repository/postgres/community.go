@@ -34,6 +34,8 @@ func (r *CommunityRepository) List(
 	offset int,
 ) (communities []*model.Community, total int64, err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "list")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery("list", start, err)
@@ -87,6 +89,8 @@ func (r *CommunityRepository) FindByID(
 ) (community *model.Community, err error) {
 
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "find_by_id")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery("find_by_id", start, err)
@@ -116,6 +120,8 @@ func (r *CommunityRepository) Create(
 	community *model.Community,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "create")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery("create", start, err)
@@ -176,6 +182,8 @@ func (r *CommunityRepository) Update(
 	community *model.Community,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "update")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery("update", start, err)
@@ -231,6 +239,8 @@ func (r *CommunityRepository) DeleteAll(
 ) (err error) {
 
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "delete_all")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery("delete_all", start, err)
@@ -256,6 +266,8 @@ func (r *CommunityRepository) FindBySlug(
 ) (community *model.Community, err error) {
 
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "find_by_slug")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery("find_by_slug", start, err)

@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:17
-
     container_name: village-postgres
 
     environment:
@@ -31,7 +30,6 @@ services:
 
   migrate:
     image: migrate/migrate:v4.18.3
-
     container_name: village-migrate
 
     command:
@@ -65,6 +63,17 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: info
       LOG_FORMAT: json
+
+      # OpenTelemetry
+      OTEL_ENABLED: "true"
+      OTEL_SERVICE_NAME: village-api
+      OTEL_SERVICE_VERSION: "0.1.2"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      OTEL_TRACES_SAMPLER_ARG: "1"
+      OTEL_ENVIRONMENT: development
+
       READ_TIMEOUT: "10"
       REQUEST_TIMEOUT: "35"
       WRITE_TIMEOUT: "40"
@@ -87,7 +96,6 @@ services:
 
   prometheus:
     image: prom/prometheus
-
     container_name: prometheus
 
     ports:
@@ -102,19 +110,168 @@ services:
 
     restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # Loki volume initialization
+  #
+  # Loki runs as UID/GID 10001. The named volume is initialized as root and
+  # then handed to Loki's non-root user.
+  # --------------------------------------------------------------------------
+
+  loki-init:
+    image: alpine:3.22
+    container_name: village-loki-init
+
+    user: "0:0"
+
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /loki
+        chown -R 10001:10001 /loki
+
+    volumes:
+      - loki-data:/loki
+
+    restart: "no"
+
+  loki:
+    image: grafana/loki:3.7.0
+    container_name: village-loki
+
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+
+    ports:
+      - "3100:3100"
+
+    volumes:
+      - ./infra/docker/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+
+    depends_on:
+      loki-init:
+        condition: service_completed_successfully
+
+    # Loki's current container is distroless/non-shell, so do not use
+    # wget/curl based CMD-SHELL healthchecks here.
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Tempo volume initialization
+  #
+  # Tempo runs as UID/GID 10001. The named volume is initialized as root and
+  # then handed to Tempo's non-root user.
+  # --------------------------------------------------------------------------
+
+  tempo-init:
+    image: alpine:3.22
+    container_name: village-tempo-init
+
+    user: "0:0"
+
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /data/tempo
+        chown -R 10001:10001 /data/tempo
+
+    volumes:
+      - tempo-data:/data/tempo
+
+    restart: "no"
+
+  tempo:
+    image: grafana/tempo:3.0.0
+    container_name: village-tempo
+
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+
+    volumes:
+      - ./infra/docker/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/data/tempo
+
+    depends_on:
+      tempo-init:
+        condition: service_completed_successfully
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/tempo",
+          "--health"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    container_name: village-alertmanager
+
+    command:
+      [
+        "--config.file=/etc/alertmanager/alertmanager.yml",
+        "--storage.path=/alertmanager"
+      ]
+
+    ports:
+      - "9093:9093"
+
+    volumes:
+      - ./infra/docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:9093/-/ready >/dev/null 2>&1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana
-
     container_name: grafana
 
     ports:
       - "3000:3000"
 
+    volumes:
+      - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
     depends_on:
       prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_healthy
+      alertmanager:
         condition: service_started
 
     restart: unless-stopped
 
 volumes:
   postgres-data:
+  loki-data:
+  tempo-data:
+  alertmanager-data:
+  grafana-data:

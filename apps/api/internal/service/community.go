@@ -9,12 +9,29 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/model"
 	"github.com/amyismebyme/the-village/apps/api/internal/repository"
 	"github.com/amyismebyme/the-village/apps/api/internal/validation"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
 	DefaultCommunityPageLimit = 20
 	MaxCommunityPageLimit     = 100
 )
+
+const communityTracerName = "github.com/amyismebyme/the-village/apps/api/internal/service"
+
+func startCommunitySpan(ctx context.Context, name string) (context.Context, trace.Span) {
+	return otel.Tracer(communityTracerName).Start(ctx, name)
+}
+
+func finishCommunitySpan(span trace.Span, err error) {
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "service operation failed")
+	}
+	span.End()
+}
 
 type CommunityListResult struct {
 	Communities []*model.Community
@@ -71,6 +88,8 @@ func (s *communityService) Create(
 	ctx context.Context,
 	community *model.Community,
 ) (err error) {
+	ctx, span := startCommunitySpan(ctx, "community.create")
+	defer func() { finishCommunitySpan(span, err) }()
 	defer func() {
 		status := "success"
 
@@ -140,12 +159,14 @@ func (s *communityService) Create(
 func (s *communityService) Get(
 	ctx context.Context,
 	id int64,
-) (*model.Community, error) {
+) (community *model.Community, err error) {
+	ctx, span := startCommunitySpan(ctx, "community.get")
+	defer func() { finishCommunitySpan(span, err) }()
 	if id <= 0 {
 		return nil, ErrInvalidCommunityID
 	}
 
-	community, err := s.repository.FindByID(
+	community, err = s.repository.FindByID(
 		ctx,
 		id,
 	)
@@ -164,7 +185,9 @@ func (s *communityService) List(
 	ctx context.Context,
 	limit int,
 	offset int,
-) (CommunityListResult, error) {
+) (result CommunityListResult, err error) {
+	ctx, span := startCommunitySpan(ctx, "community.list")
+	defer func() { finishCommunitySpan(span, err) }()
 	if limit == 0 {
 		limit = DefaultCommunityPageLimit
 	}
@@ -203,6 +226,8 @@ func (s *communityService) Update(
 	ctx context.Context,
 	community *model.Community,
 ) (err error) {
+	ctx, span := startCommunitySpan(ctx, "community.update")
+	defer func() { finishCommunitySpan(span, err) }()
 	defer func() {
 		status := "success"
 
@@ -300,6 +325,8 @@ func (s *communityService) Delete(
 	ctx context.Context,
 	id int64,
 ) (err error) {
+	ctx, span := startCommunitySpan(ctx, "community.delete")
+	defer func() { finishCommunitySpan(span, err) }()
 	defer func() {
 		status := "success"
 

@@ -9,7 +9,12 @@ import (
 
 	"github.com/amyismebyme/the-village/apps/api/internal/cache"
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
+
+const tracerName = "github.com/amyismebyme/the-village/apps/api/internal/repository/postgres"
 
 type CacheMode int
 
@@ -290,12 +295,25 @@ func (s *IngestionService) IngestListingWithOptions(
 func (s *IngestionService) normalizeListing(
 	ctx context.Context,
 	listing ListingResponse,
-) ([]external.Item, error) {
+) (items []external.Item, err error) {
+	ctx, normalizeSpan := otel.Tracer(tracerName).Start(ctx, "reddit.normalize")
+	normalizeSpan.SetAttributes(
+		attribute.String("source", string(external.SourceReddit)),
+		attribute.String("operation", "normalize"),
+	)
+	defer func() {
+		if err != nil {
+			normalizeSpan.RecordError(err)
+			normalizeSpan.SetStatus(codes.Error, "reddit normalization failed")
+		}
+		normalizeSpan.End()
+	}()
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	items := make(
+	items = make(
 		[]external.Item,
 		0,
 		len(listing.Data.Children),
@@ -336,16 +354,30 @@ func (s *IngestionService) normalizeListing(
 		)
 	}
 
-	items, err := external.DeduplicateItems(
+	dedupeCtx, dedupeSpan := otel.Tracer(tracerName).Start(
 		ctx,
+		"reddit.deduplicate",
+	)
+	dedupeSpan.SetAttributes(
+		attribute.String("source", string(external.SourceReddit)),
+		attribute.String("operation", "deduplicate"),
+	)
+
+	items, err = external.DeduplicateItems(
+		dedupeCtx,
 		items,
 	)
 	if err != nil {
+		dedupeSpan.RecordError(err)
+		dedupeSpan.SetStatus(codes.Error, "reddit deduplication failed")
+		dedupeSpan.End()
 		return nil, fmt.Errorf(
 			"reddit ingestion: deduplicate items: %w",
 			err,
 		)
 	}
+
+	dedupeSpan.End()
 
 	return items, nil
 }

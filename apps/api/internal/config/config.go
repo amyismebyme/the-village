@@ -51,6 +51,7 @@ type Config struct {
 	External        ExternalConfig
 	Worker          WorkerConfig
 	Cache           CacheConfig
+	Telemetry       TelemetryConfig
 }
 
 type RedditConfig struct {
@@ -61,6 +62,17 @@ type RedditConfig struct {
 	BaseURL         string
 	AuthBaseURL     string
 	RequestInterval time.Duration
+}
+
+type TelemetryConfig struct {
+	Enabled        bool
+	ServiceName    string
+	ServiceVersion string
+	Endpoint       string
+	Insecure       bool
+	Sampler        string
+	SamplerArg     float64
+	Environment    string
 }
 
 type CacheConfig struct {
@@ -152,6 +164,41 @@ func Load() Config {
 					1,
 				),
 			},
+		},
+
+		Telemetry: TelemetryConfig{
+			Enabled: getBool(
+				"OTEL_ENABLED",
+				false,
+			),
+			ServiceName: getEnv(
+				"OTEL_SERVICE_NAME",
+				"village-api",
+			),
+			ServiceVersion: getEnv(
+				"OTEL_SERVICE_VERSION",
+				"",
+			),
+			Endpoint: getEnv(
+				"OTEL_EXPORTER_OTLP_ENDPOINT",
+				"http://localhost:4318/v1/traces",
+			),
+			Insecure: getBool(
+				"OTEL_EXPORTER_OTLP_INSECURE",
+				false,
+			),
+			Sampler: getEnv(
+				"OTEL_TRACES_SAMPLER",
+				"parentbased_traceidratio",
+			),
+			SamplerArg: getFloat(
+				"OTEL_TRACES_SAMPLER_ARG",
+				1,
+			),
+			Environment: getEnv(
+				"OTEL_ENVIRONMENT",
+				getEnv("ENVIRONMENT", "development"),
+			),
 		},
 
 		Cache: CacheConfig{

@@ -37,7 +37,8 @@ func (h *Handler) logCommunityOperation(
 		)
 	}
 
-	h.logger.Info(
+	h.logger.InfoContext(
+		r.Context(),
 		"community operation completed",
 		args...,
 	)

@@ -29,6 +29,32 @@ func ObserveOperation(
 	start time.Time,
 	err error,
 ) {
+	ObserveOperationContext(
+		context.Background(),
+		logger,
+		source,
+		operation,
+		externalID,
+		status,
+		requestAttempted,
+		start,
+		err,
+	)
+}
+
+// ObserveOperationContext records a logical external operation log using the
+// supplied context so the slog trace handler can correlate trace_id/span_id.
+func ObserveOperationContext(
+	ctx context.Context,
+	logger *slog.Logger,
+	source Source,
+	operation string,
+	externalID string,
+	status string,
+	requestAttempted bool,
+	start time.Time,
+	err error,
+) {
 	duration := time.Since(start)
 	errorClass := ClassifyError(err)
 
@@ -66,7 +92,8 @@ func ObserveOperation(
 	}
 
 	if errors.Is(err, context.Canceled) {
-		logger.Info(
+		logger.InfoContext(
+			ctx,
 			"external integration operation canceled",
 			args...,
 		)
@@ -74,7 +101,8 @@ func ObserveOperation(
 		return
 	}
 
-	logger.Info(
+	logger.InfoContext(
+		ctx,
 		"external integration operation completed",
 		args...,
 	)
