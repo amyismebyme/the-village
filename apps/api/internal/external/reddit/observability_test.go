@@ -2,11 +2,13 @@ package reddit
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"github.com/amyismebyme/the-village/apps/api/internal/external"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -220,7 +222,8 @@ func TestRedditRetryObservability(
 	}
 
 	observeRetry(
-		nil,
+		context.TODO(),
+		slog.Default(),
 		"fetch",
 		event,
 	)

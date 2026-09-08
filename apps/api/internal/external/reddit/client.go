@@ -241,6 +241,7 @@ func (c *Client) FetchListing(
 
 	defer func() {
 		observeOperation(
+			ctx,
 			c.logger,
 			"fetch",
 			externalID,
@@ -361,6 +362,7 @@ func (c *Client) FetchListing(
 			operation,
 			func(event external.RetryEvent) {
 				observeRetry(
+					ctx,
 					c.logger,
 					"fetch",
 					event,

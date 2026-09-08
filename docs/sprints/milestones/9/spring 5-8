@@ -1,0 +1,39 @@
+Milestone 9 — Tasks 9.5–9.8
+
+This bundle adds service-layer tracing, Reddit external-operation tracing, PostgreSQL spans, and the Loki logging architecture documentation.
+
+Prerequisite
+
+The repository should already include the Milestone 9 tasks 9.1–9.4 OpenTelemetry foundation and HTTP tracing middleware. The current source changes use the global OpenTelemetry API established by that foundation.
+
+Trace hierarchy
+
+The intended worker-driven ingestion trace is:
+
+HTTP server span
+-> reddit.ingest
+-> reddit.authenticate
+-> reddit.ingest_listing
+-> reddit.fetch_listing
+-> reddit.normalize
+-> reddit.deduplicate
+-> external_item.upsert_batch
+-> db.query
+
+Service requests follow:
+
+HTTP server span
+-> community.create|get|list|update|delete
+-> db.query
+## Important baseline note
+
+The latest repository archive supplied for this task did not contain the previously discussed `internal/telemetry` package or OpenTelemetry module dependencies. To keep this bundle internally consistent, the bundle includes the 9.1–9.4 foundation files as prerequisites, plus the 9.5–9.8 changes.
+
+If those 9.1–9.4 files are already present in the working tree, treat the corresponding files in this bundle as the matching source-of-truth version rather than merging duplicate implementations.
+
+## Trace hierarchy
+
+HTTP request
+→ community service operation / reddit.ingest
+→ reddit.authenticate / reddit.fetch_listing / reddit.normalize / reddit.deduplicate / external_item.upsert_batch
+→ db.query

@@ -1,0 +1,14 @@
+## Added
+- `internal/telemetry` package with OpenTelemetry configuration, OTLP/HTTP trace exporter, resource configuration, sampler configuration, and graceful shutdown.
+- HTTP tracing middleware with W3C Trace Context/Baggage extraction.
+- HTTP server span attributes for method, route, status, and duration.
+- Telemetry configuration loading and validation.
+- Unit tests for telemetry configuration/provider and HTTP tracing.
+
+## Modified
+- `apps/api/internal/app/app.go` initializes telemetry and gracefully shuts it down.
+- `apps/api/internal/server/router.go` adds the tracing middleware.
+- `apps/api/internal/config/config.go` loads OTEL_* environment variables.
+- `apps/api/internal/config/validate.go` validates OTEL configuration.
+- `.env.example` and Docker Compose contain disabled-by-default telemetry settings.
+- `apps/api/go.mod` adds OpenTelemetry v1.46.0 dependencies.

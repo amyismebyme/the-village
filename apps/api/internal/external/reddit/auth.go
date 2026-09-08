@@ -223,6 +223,7 @@ func (a *Authenticator) fetchToken(
 
 	defer func() {
 		observeOperation(
+			ctx,
 			a.logger,
 			"authenticate",
 			"",
@@ -356,6 +357,7 @@ func (a *Authenticator) fetchToken(
 			operation,
 			func(event external.RetryEvent) {
 				observeRetry(
+					ctx,
 					a.logger,
 					"authenticate",
 					event,

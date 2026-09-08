@@ -41,6 +41,8 @@ func (r *ExternalItemRepository) UpsertBatch(
 	defer cancel()
 
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "external_item_upsert_batch")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(

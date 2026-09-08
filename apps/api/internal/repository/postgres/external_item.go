@@ -36,6 +36,8 @@ func (r *ExternalItemRepository) Upsert(
 	item external.Item,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "external_item_upsert")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -121,6 +123,8 @@ func (r *ExternalItemRepository) FindByIdentity(
 	identity external.Identity,
 ) (item *external.Item, err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "external_item_find_by_identity")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(
@@ -191,6 +195,8 @@ func (r *ExternalItemRepository) DeleteAll(
 	ctx context.Context,
 ) (err error) {
 	start := time.Now()
+	ctx, span := startDBSpan(ctx, "external_item_delete_all")
+	defer func() { finishDBSpan(span, err) }()
 
 	defer func() {
 		observeQuery(

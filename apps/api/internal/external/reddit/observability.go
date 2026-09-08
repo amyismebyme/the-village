@@ -11,6 +11,7 @@ import (
 )
 
 func observeOperation(
+	ctx context.Context,
 	logger *slog.Logger,
 	operation string,
 	externalID string,
@@ -19,7 +20,8 @@ func observeOperation(
 	start time.Time,
 	err error,
 ) {
-	external.ObserveOperation(
+	external.ObserveOperationContext(
+		ctx,
 		logger,
 		external.SourceReddit,
 		operation,
@@ -35,6 +37,7 @@ func observeOperation(
 	// error.
 	if external.IsRetryExhausted(err) {
 		observeRetryExhausted(
+			ctx,
 			logger,
 			operation,
 		)
@@ -57,6 +60,7 @@ func observeRequestAttempt(
 }
 
 func observeRetry(
+	ctx context.Context,
 	logger *slog.Logger,
 	operation string,
 	event external.RetryEvent,
@@ -92,7 +96,8 @@ func observeRetry(
 		return
 	}
 
-	logger.Warn(
+	logger.WarnContext(
+		ctx,
 		"external request retry scheduled",
 		"source",
 		external.SourceReddit,
@@ -110,6 +115,7 @@ func observeRetry(
 }
 
 func observeRetryExhausted(
+	ctx context.Context,
 	logger *slog.Logger,
 	operation string,
 ) {
@@ -124,7 +130,8 @@ func observeRetryExhausted(
 		return
 	}
 
-	logger.Error(
+	logger.ErrorContext(
+		ctx,
 		"external request retry budget exhausted",
 		"source",
 		external.SourceReddit,

@@ -33,14 +33,16 @@ func NewRouter(
 	}
 
 	return middleware.RequestID(
-		middleware.Logging(
-			appLogger,
-			metrics.Middleware(
-				middleware.Recovery(
-					appLogger,
-					middleware.RequestTimeout(
-						timeout,
-						mux,
+		middleware.Tracing(
+			middleware.Logging(
+				appLogger,
+				metrics.Middleware(
+					middleware.Recovery(
+						appLogger,
+						middleware.RequestTimeout(
+							timeout,
+							mux,
+						),
 					),
 				),
 			),

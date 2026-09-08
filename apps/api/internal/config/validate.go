@@ -52,6 +52,10 @@ func Validate(cfg Config) error {
 		return err
 	}
 
+	if err := validateTelemetry(cfg); err != nil {
+		return err
+	}
+
 	if err := validateRetry(cfg); err != nil {
 		return err
 	}
@@ -168,6 +172,49 @@ func validateHTTPSURL(
 	}
 
 	return nil
+}
+
+func validateTelemetry(cfg Config) error {
+	if !cfg.Telemetry.Enabled {
+		return nil
+	}
+
+	if strings.TrimSpace(cfg.Telemetry.ServiceName) == "" {
+		return fmt.Errorf(
+			"OTEL_SERVICE_NAME must be configured when OTEL_ENABLED is true",
+		)
+	}
+
+	if strings.TrimSpace(cfg.Telemetry.Endpoint) == "" {
+		return fmt.Errorf(
+			"OTEL_EXPORTER_OTLP_ENDPOINT must be configured when OTEL_ENABLED is true",
+		)
+	}
+
+	if cfg.Telemetry.SamplerArg < 0 || cfg.Telemetry.SamplerArg > 1 {
+		return fmt.Errorf(
+			"OTEL_TRACES_SAMPLER_ARG must be between 0 and 1",
+		)
+	}
+
+	sampler := strings.ToLower(
+		strings.TrimSpace(cfg.Telemetry.Sampler),
+	)
+
+	switch sampler {
+	case "always_on",
+		"always_off",
+		"traceidratio",
+		"parentbased_always_on",
+		"parentbased_always_off",
+		"parentbased_traceidratio":
+		return nil
+	default:
+		return fmt.Errorf(
+			"unsupported OTEL_TRACES_SAMPLER %q",
+			cfg.Telemetry.Sampler,
+		)
+	}
 }
 
 func validateRetry(
