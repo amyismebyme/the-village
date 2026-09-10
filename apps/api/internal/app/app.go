@@ -48,49 +48,18 @@ func Run() error {
 
 	appLogger := logger.New(cfg)
 
-	if cfg.Telemetry.ServiceVersion == "" {
-		cfg.Telemetry.ServiceVersion = appruntime.BuildVersion
-	}
-
-	telemetryProvider, err := telemetry.Initialize(
+	telemetryShutdown, err := telemetry.Setup(
 		context.Background(),
-		telemetry.Config{
-			Enabled:        cfg.Telemetry.Enabled,
-			ServiceName:    cfg.Telemetry.ServiceName,
-			ServiceVersion: cfg.Telemetry.ServiceVersion,
-			Endpoint:       cfg.Telemetry.Endpoint,
-			Insecure:       cfg.Telemetry.Insecure,
-			Sampler:        cfg.Telemetry.Sampler,
-			SamplerArg:     cfg.Telemetry.SamplerArg,
-			Environment:    cfg.Telemetry.Environment,
-		},
+		telemetry.LoadFromEnv(os.Getenv),
 		appLogger,
 	)
 	if err != nil {
-		return fmt.Errorf(
-			"initialize OpenTelemetry: %w",
-			err,
-		)
+		return fmt.Errorf("initialize telemetry: %w", err)
 	}
-
 	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(
-			context.Background(),
-			cfg.ShutdownTimeout,
-		)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancel()
-
-		if err := telemetry.Shutdown(
-			shutdownCtx,
-			telemetryProvider,
-			appLogger,
-		); err != nil {
-			appLogger.Error(
-				"OpenTelemetry shutdown failed",
-				"error",
-				err,
-			)
-		}
+		_ = telemetryShutdown(shutdownCtx)
 	}()
 
 	startupCtx, startupCancel := context.WithTimeout(

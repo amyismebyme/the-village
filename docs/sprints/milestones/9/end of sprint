@@ -1,0 +1,25 @@
+# Sprint 25 — Milestone 9 Final Gate (9.20–9.25)
+
+## 9.20 Alert firing tests
+
+Deliver deterministic Prometheus rule tests plus a live Alertmanager routing-state test. Controlled conditions cover API 5xx, external 5xx, retry exhaustion, worker failures, rate-limit pressure, cache degradation, database connection loss, and API unavailability.
+
+## 9.21 Telemetry overhead benchmark
+
+Measure HTTP middleware latency with telemetry off/on and Reddit ingestion throughput with tracing off/on. Benchmarks report allocations and repeat multiple times. Results are used to detect accidental overhead, not to establish a premature performance budget.
+
+## 9.22 Export failure behavior
+
+Verify API availability while Tempo, Loki, or Alertmanager is stopped. Trace export failures are observed/logged; logs continue to stdout; Prometheus/Alertmanager are operational consumers and are not serving-path dependencies.
+
+## 9.23 Documentation
+
+Add `docs/OBSERVABILITY.md` covering metrics, logs, traces, Loki, Tempo, Prometheus, Alertmanager, Grafana, and an alert-to-dependency troubleshooting flow.
+
+## 9.24 Docker observability verification
+
+`verify-observability-stack.ps1/.sh` validates the Compose file, waits for API/Prometheus/Grafana/Loki/Tempo/Alertmanager endpoints, prints service status, and intentionally stops Tempo/Loki/Alertmanager one at a time to prove API availability remains intact.
+
+## 9.25 Milestone gate
+
+`verify-milestone9.ps1/.sh` orchestrates configuration validation, security scan, alert tests, stack verification, repository-wide Go tests, and performance benchmarks.

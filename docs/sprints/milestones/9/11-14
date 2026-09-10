@@ -1,0 +1,51 @@
+# Implementation notes
+
+Grafana Tempo supports local filesystem storage for single-node development and documents OTLP receiver configuration on ports 4317/4318. The 24h retention here is intentionally a development default, not a production sizing recommendation. citeturn892261search1turn892261search0
+
+Tempo 3.0 supports monolithic `-target=all`; this patch keeps that simple model and does not introduce object storage or distributed deployment. citeturn892261search2
+
+Alerting remains Prometheus -> Alertmanager. Application code does not decide notification routing.
+
+The API has no `depends_on: tempo`, so Tempo can be stopped after the API starts. Trace export failures are logged and dropped by the batch exporter rather than returned as API startup failures.
+
+# Phase 4/5 — Sprint 21/22 Tasks
+
+## Sprint 21 — Tempo
+
+### 9.11 Tempo integration
+- Configure OpenTelemetry OTLP/HTTP from the API to Tempo.
+- Keep Tempo out of API startup dependencies.
+- Fail open when exporter initialization fails.
+- Log asynchronous export failures without terminating the API.
+- Extract W3C trace context and create server spans.
+- Provision Tempo in Grafana.
+- Smoke-test traces end-to-end.
+
+### 9.12 Trace retention/storage
+- Use Tempo monolithic/local storage for development.
+- Persist WAL and trace blocks in `tempo-data`.
+- Set trace block retention to 24h.
+- Set compacted-block retention to 1h.
+- Initialize the shared volume as UID/GID 10001 to prevent permissions failures.
+- Treat 2 GiB as the development storage target; monitor disk usage rather than adding distributed storage in this milestone.
+
+## Sprint 22 — Alertmanager
+
+### 9.13 Alerting architecture
+- Prometheus evaluates alert rules.
+- Prometheus forwards firing alerts to Alertmanager.
+- Alertmanager owns grouping, repeat intervals, and inhibition.
+- Keep alerting logic out of application code.
+- Leave notification integration as an operator-owned receiver configuration.
+
+### 9.14 Initial production alerts
+- API unavailable.
+- API 5xx ratio > 5%.
+- External upstream 5xx ratio > 10%.
+- Any external retry exhaustion in the last 10 minutes.
+- Elevated worker failure rate.
+- Sustained external rate-limit pressure.
+- Cache hit ratio < 70% under meaningful traffic.
+- Database pool has zero connections.
+- Validate rule syntax with `promtool check rules`.
+- Validate Prometheus -> Alertmanager connectivity.

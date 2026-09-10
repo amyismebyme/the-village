@@ -1,44 +1,99 @@
 groups:
-
-  - name: village-alerts
-
+  - name: village-operational-alerts
     rules:
-
       - alert: VillageAPIUnavailable
-
         expr: up{job="village-api"} == 0
-
-        for: 30s
-
+        for: 2m
         labels:
           severity: critical
-
+          service: village-api
         annotations:
-          summary: Village API is down
-          description: Prometheus cannot scrape the Village API.
+          summary: Village API is unavailable
+          description: Prometheus has been unable to scrape the Village API for 2 minutes.
 
-      - alert: HighRequestLatency
-
-        expr: village:http_request_duration:p95 > 0.5
-
-        for: 2m
-
+      - alert: VillageAPIHigh5xxRate
+        expr: |
+          village:http_5xx_ratio:rate10m > 0.05
+          and
+          sum(rate(village_http_requests_total[10m])) > 0.1
+        for: 5m
         labels:
           severity: warning
-
+          service: village-api
         annotations:
-          summary: High request latency
-          description: P95 latency exceeded 500ms.
+          summary: Village API 5xx rate is elevated
+          description: More than 5% of HTTP requests have returned 5xx responses for 5 minutes.
 
-      - alert: HighServerErrorRate
-
-        expr: village:http_errors:rate5m > 1
-
-        for: 2m
-
+      - alert: VillageExternalHigh5xxRate
+        expr: |
+          village:external_5xx_ratio:rate10m > 0.10
+          and
+          village:external_requests:rate10m > 0.05
+        for: 5m
         labels:
           severity: warning
-
+          service: village-api
         annotations:
-          summary: Elevated HTTP 5xx errors
-          description: Error rate exceeds threshold.
+          summary: External upstream 5xx rate is elevated
+          description: More than 10% of outbound external requests have returned 5xx responses for 5 minutes.
+
+      - alert: VillageExternalRetryExhaustion
+        expr: increase(village_external_retry_exhausted_total[10m]) > 0
+        labels:
+          severity: critical
+          service: village-api
+        annotations:
+          summary: External retry budget exhausted
+          description: At least one outbound external operation exhausted its retry budget in the last 10 minutes.
+
+      - alert: VillageWorkerFailuresElevated
+        expr: village:worker_failures:rate10m > 0.005
+        for: 10m
+        labels:
+          severity: warning
+          service: village-api
+        annotations:
+          summary: Background worker failures are elevated
+          description: Worker failures have remained above the operational threshold for 10 minutes.
+
+      - alert: VillageExternalRateLimitPressure
+        expr: |
+          village:rate_limiter_waits:rate10m > 0.01
+          and
+          village:rate_limiter_wait_seconds:rate10m > 0.5
+        for: 15m
+        labels:
+          severity: warning
+          service: village-api
+        annotations:
+          summary: Sustained external rate-limit pressure
+          description: External calls are repeatedly waiting on the rate limiter and average wait time exceeds 500ms.
+
+      - alert: VillageCacheHitRatioLow
+        expr: |
+          village:cache_hit_ratio:rate15m < 0.70
+          and
+          (
+            sum(rate(village_cache_hits_total[15m]))
+            + sum(rate(village_cache_misses_total[15m]))
+          ) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: village-api
+        annotations:
+          summary: Cache hit ratio is unexpectedly low
+          description: Cache hit ratio has remained below 70% for 15 minutes under meaningful cache traffic.
+
+      - alert: VillageDatabaseConnectionsUnavailable
+        expr: |
+          village_db_pool_max_connections > 0
+          and
+          village_db_pool_total_connections == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: village-api
+        annotations:
+          summary: Database connection pool has no connections
+          description: The API is reporting zero active PostgreSQL connections while the pool is configured with a positive maximum.

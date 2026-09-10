@@ -2,101 +2,64 @@ package telemetry
 
 import (
 	"context"
+	"io"
+	"log/slog"
+	"strings"
 	"testing"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
-func TestConfigValidateDisabled(t *testing.T) {
-	cfg := Config{}
-
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("validate disabled config: %v", err)
+func TestLoadFromEnvDefaults(t *testing.T) {
+	cfg := LoadFromEnv(func(string) string { return "" })
+	if cfg.Enabled {
+		t.Fatal("expected telemetry disabled by default")
+	}
+	if cfg.ServiceName != "village-api" {
+		t.Fatalf("unexpected service name %q", cfg.ServiceName)
+	}
+	if cfg.Endpoint != "http://localhost:4318/v1/traces" {
+		t.Fatalf("unexpected endpoint %q", cfg.Endpoint)
 	}
 }
 
-func TestConfigValidateEnabledRequiresEndpoint(t *testing.T) {
-	cfg := Config{
-		Enabled:     true,
-		ServiceName: "village-api",
-		Sampler:     "always_on",
-	}
-
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected endpoint validation error")
-	}
-}
-
-func TestConfigValidateSampler(t *testing.T) {
-	cfg := Config{
-		Enabled:     true,
-		ServiceName: "village-api",
-		Endpoint:    "http://localhost:4318/v1/traces",
-		Sampler:     "traceidratio",
-		SamplerArg:  0.25,
-		Environment: "test",
-	}
-
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("validate sampler config: %v", err)
-	}
-}
-
-func TestNewProviderDisabled(t *testing.T) {
-	provider, err := NewProvider(
-		context.Background(),
-		Config{Enabled: false},
-	)
+func TestSetupDisabledUsesNoopProvider(t *testing.T) {
+	shutdown, err := Setup(context.Background(), Config{Enabled: false}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
-		t.Fatalf("create disabled provider: %v", err)
+		t.Fatalf("setup telemetry: %v", err)
+	}
+	if shutdown == nil {
+		t.Fatal("expected shutdown function")
 	}
 
-	if provider.Enabled() {
-		t.Fatal("expected provider to be disabled")
+	span := otel.Tracer("test").Start
+	ctx, s := span(context.Background(), "disabled")
+	_ = ctx
+	if s.SpanContext().IsValid() {
+		t.Fatal("expected noop span context")
 	}
-
-	tracer := provider.Tracer()
-	if tracer == nil {
-		t.Fatal("expected non-nil no-op tracer")
-	}
-
-	_, span := tracer.Start(
-		context.Background(),
-		"test",
-	)
-	if span == nil {
-		t.Fatal("expected non-nil span")
-	}
-	span.End()
+	s.End()
 }
 
-func TestSamplerFromConfig(t *testing.T) {
-	cases := []struct {
-		name string
-		cfg  Config
-		want string
-	}{
-		{
-			name: "always on",
-			cfg: Config{
-				Sampler: "always_on",
-			},
-			want: "AlwaysOnSampler",
-		},
-		{
-			name: "always off",
-			cfg: Config{
-				Sampler: "always_off",
-			},
-			want: "AlwaysOffSampler",
-		},
-	}
+func TestSetupFailsOpenForInvalidExporterConfig(t *testing.T) {
+	logs := new(strings.Builder)
+	logger := slog.New(slog.NewTextHandler(logs, nil))
 
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			sampler := samplerFromConfig(tt.cfg)
-			if sampler == nil {
-				t.Fatal("expected sampler")
-			}
-		})
+	shutdown, err := Setup(context.Background(), Config{
+		Enabled:     true,
+		ServiceName: "test",
+		Endpoint:    "://bad",
+	}, logger)
+	if err != nil {
+		t.Fatalf("expected fail-open setup, got error: %v", err)
 	}
-
+	if shutdown == nil {
+		t.Fatal("expected shutdown function")
+	}
+	if !strings.Contains(logs.String(), "tracing disabled") {
+		t.Fatal("expected exporter failure to be logged")
+	}
 }
+
+var _ trace.Tracer = otel.Tracer("compile-check")

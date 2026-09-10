@@ -1,23 +1,53 @@
 groups:
-
   - name: village-recording-rules
-
     interval: 15s
-
     rules:
-
       - record: village:http_requests:rate5m
-        expr: |
-          rate(village_http_requests_total[5m])
+        expr: rate(village_http_requests_total[5m])
 
       - record: village:http_errors:rate5m
-        expr: |
-          rate(village_http_requests_total{status=~"5.."}[5m])
+        expr: rate(village_http_requests_total{status=~"5.."}[5m])
 
       - record: village:http_request_duration:p95
         expr: |
           histogram_quantile(
             0.95,
-            sum(rate(village_http_request_duration_seconds_bucket[5m]))
-            by (le)
+            sum(rate(village_http_request_duration_seconds_bucket[5m])) by (le)
+          )
+
+      - record: village:http_5xx_ratio:rate10m
+        expr: |
+          sum(rate(village_http_requests_total{status=~"5.."}[10m]))
+          /
+          clamp_min(sum(rate(village_http_requests_total[10m])), 0.001)
+
+      - record: village:external_requests:rate10m
+        expr: sum(rate(village_external_requests_total[10m]))
+
+      - record: village:external_5xx_ratio:rate10m
+        expr: |
+          sum(rate(village_external_requests_total{status=~"5.."}[10m]))
+          /
+          clamp_min(sum(rate(village_external_requests_total[10m])), 0.001)
+
+      - record: village:worker_failures:rate10m
+        expr: sum(rate(village_worker_failures_total[10m]))
+
+      - record: village:rate_limiter_waits:rate10m
+        expr: sum(rate(village_rate_limiter_waits_total[10m]))
+
+      - record: village:rate_limiter_wait_seconds:rate10m
+        expr: |
+          sum(rate(village_rate_limiter_wait_duration_seconds_sum[10m]))
+          /
+          clamp_min(sum(rate(village_rate_limiter_wait_duration_seconds_count[10m])), 0.001)
+
+      - record: village:cache_hit_ratio:rate15m
+        expr: |
+          sum(rate(village_cache_hits_total[15m]))
+          /
+          clamp_min(
+            sum(rate(village_cache_hits_total[15m]))
+            + sum(rate(village_cache_misses_total[15m])),
+            0.001
           )

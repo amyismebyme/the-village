@@ -2,11 +2,28 @@ global:
   resolve_timeout: 5m
 
 route:
-  receiver: default
-  group_by: [alertname, service]
-  group_wait: 10s
-  group_interval: 30s
+  receiver: village-default
+  group_by:
+    - alertname
+    - service
+    - source
+    - severity
+  group_wait: 30s
+  group_interval: 5m
   repeat_interval: 4h
 
 receivers:
-  - name: default
+  - name: village-default
+
+# Add a real notification integration in production (webhook, email,
+# PagerDuty, Slack, etc.) without modifying Prometheus rules or application code.
+
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal:
+      - alertname
+      - service
+      - source

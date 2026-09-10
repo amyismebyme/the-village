@@ -2,7 +2,6 @@ auth_enabled: false
 
 server:
   http_listen_port: 3100
-  grpc_listen_port: 9096
 
 common:
   path_prefix: /loki
@@ -10,14 +9,10 @@ common:
   ring:
     kvstore:
       store: inmemory
-  storage:
-    filesystem:
-      chunks_directory: /loki/chunks
-      rules_directory: /loki/rules
 
 schema_config:
   configs:
-    - from: 2024-01-01
+    - from: 2025-01-01
       store: tsdb
       object_store: filesystem
       schema: v13
@@ -25,8 +20,14 @@ schema_config:
         prefix: index_
         period: 24h
 
-ruler:
-  alertmanager_url: http://alertmanager:9093
+storage_config:
+  filesystem:
+    directory: /loki/chunks
 
-analytics:
-  reporting_enabled: false
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+limits_config:
+  retention_period: 24h

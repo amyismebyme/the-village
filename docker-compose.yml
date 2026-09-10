@@ -2,69 +2,51 @@ services:
   postgres:
     image: postgres:17
     container_name: village-postgres
-
     environment:
       POSTGRES_DB: village
       POSTGRES_USER: village
       POSTGRES_PASSWORD: village
-
     ports:
       - "5432:5432"
-
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U village -d village"
-        ]
+      test: ["CMD-SHELL", "pg_isready -U village -d village"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
-
     restart: unless-stopped
 
   migrate:
     image: migrate/migrate:v4.18.3
     container_name: village-migrate
-
     command:
       [
         "-path=/migrations",
         "-database=postgres://village:village@postgres:5432/village?sslmode=disable",
         "up"
       ]
-
     volumes:
       - ./migrations:/migrations:ro
-
     depends_on:
       postgres:
         condition: service_healthy
-
     restart: "no"
 
   village-api:
     build:
       context: .
       dockerfile: Dockerfile
-
     container_name: village-api
-
     ports:
       - "8080:8080"
-
     environment:
       PORT: "8080"
       ENVIRONMENT: development
       LOG_LEVEL: info
       LOG_FORMAT: json
-
-      # OpenTelemetry
       OTEL_ENABLED: "true"
       OTEL_SERVICE_NAME: village-api
       OTEL_SERVICE_VERSION: "0.1.2"
@@ -73,190 +55,134 @@ services:
       OTEL_TRACES_SAMPLER: parentbased_traceidratio
       OTEL_TRACES_SAMPLER_ARG: "1"
       OTEL_ENVIRONMENT: development
-
       READ_TIMEOUT: "10"
       REQUEST_TIMEOUT: "35"
       WRITE_TIMEOUT: "40"
       IDLE_TIMEOUT: "60"
       SHUTDOWN_TIMEOUT: "15"
       DB_QUERY_TIMEOUT: "30"
-
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_NAME: village
       DB_USER: village
       DB_PASSWORD: village
       DB_SSLMODE: disable
-
     depends_on:
       migrate:
         condition: service_completed_successfully
-
     restart: unless-stopped
 
   prometheus:
     image: prom/prometheus
     container_name: prometheus
-
     ports:
       - "9090:9090"
-
     volumes:
       - ./infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-
+      - ./infra/docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./infra/docker/prometheus/recording_rules.yml:/etc/prometheus/recording_rules.yml:ro
     depends_on:
       village-api:
         condition: service_started
-
+      alertmanager:
+        condition: service_started
     restart: unless-stopped
-
-  # --------------------------------------------------------------------------
-  # Loki volume initialization
-  #
-  # Loki runs as UID/GID 10001. The named volume is initialized as root and
-  # then handed to Loki's non-root user.
-  # --------------------------------------------------------------------------
 
   loki-init:
     image: alpine:3.22
     container_name: village-loki-init
-
     user: "0:0"
-
     command:
       - /bin/sh
       - -c
       - |
         mkdir -p /loki
         chown -R 10001:10001 /loki
-
     volumes:
       - loki-data:/loki
-
     restart: "no"
 
   loki:
     image: grafana/loki:3.7.0
     container_name: village-loki
-
     command:
       - -config.file=/etc/loki/loki-config.yml
-
     ports:
       - "3100:3100"
-
     volumes:
       - ./infra/docker/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki-data:/loki
-
     depends_on:
       loki-init:
         condition: service_completed_successfully
-
-    # Loki's current container is distroless/non-shell, so do not use
-    # wget/curl based CMD-SHELL healthchecks here.
     restart: unless-stopped
-
-  # --------------------------------------------------------------------------
-  # Tempo volume initialization
-  #
-  # Tempo runs as UID/GID 10001. The named volume is initialized as root and
-  # then handed to Tempo's non-root user.
-  # --------------------------------------------------------------------------
 
   tempo-init:
     image: alpine:3.22
     container_name: village-tempo-init
-
     user: "0:0"
-
     command:
       - /bin/sh
       - -c
       - |
-        mkdir -p /data/tempo
+        mkdir -p /data/tempo/wal /data/tempo/blocks
         chown -R 10001:10001 /data/tempo
-
     volumes:
       - tempo-data:/data/tempo
-
     restart: "no"
 
   tempo:
     image: grafana/tempo:3.0.0
     container_name: village-tempo
-
     command:
       - -config.file=/etc/tempo/tempo.yml
-
     ports:
       - "3200:3200"
       - "4317:4317"
       - "4318:4318"
-
     volumes:
       - ./infra/docker/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo-data:/data/tempo
-
     depends_on:
       tempo-init:
         condition: service_completed_successfully
-
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/tempo",
-          "--health"
-        ]
+      test: ["CMD", "/tempo", "--health"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 15s
-
     restart: unless-stopped
 
   alertmanager:
     image: prom/alertmanager:v0.34.0
     container_name: village-alertmanager
-
     command:
       [
         "--config.file=/etc/alertmanager/alertmanager.yml",
         "--storage.path=/alertmanager"
       ]
-
     ports:
       - "9093:9093"
-
     volumes:
       - ./infra/docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
-
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:9093/-/ready >/dev/null 2>&1"
-        ]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9093/-/ready >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
-
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
   grafana:
     image: grafana/grafana
     container_name: grafana
-
     ports:
       - "3000:3000"
-
     volumes:
       - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
-
     depends_on:
       prometheus:
         condition: service_started
@@ -264,9 +190,12 @@ services:
         condition: service_started
       tempo:
         condition: service_healthy
-      alertmanager:
-        condition: service_started
-
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
 
 volumes:

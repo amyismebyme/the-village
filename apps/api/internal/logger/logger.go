@@ -2,6 +2,7 @@ package logger
 
 import (
 	"github.com/amyismebyme/the-village/apps/api/internal/config"
+	"github.com/amyismebyme/the-village/apps/api/internal/observability"
 	"log/slog"
 	"os"
 	"strings"
@@ -35,5 +36,5 @@ func New(cfg config.Config) *slog.Logger {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 
-	return slog.New(newTraceHandler(handler))
+	return slog.New(observability.NewSanitizingHandler(handler))
 }
