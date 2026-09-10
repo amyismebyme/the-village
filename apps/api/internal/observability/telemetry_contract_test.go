@@ -40,8 +40,11 @@ func TestTelemetryDefinitionsDoNotUseSecretBearingKeys(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
-
+		defer func() {
+			if err := file.Close(); err != nil {
+				t.Errorf("failed to close %s: %v", path, err)
+			}
+		}()
 		scanner := bufio.NewScanner(file)
 		lineNo := 0
 		for scanner.Scan() {
