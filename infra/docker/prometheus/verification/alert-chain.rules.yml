@@ -1,0 +1,14 @@
+groups:
+  - name: village-alert-chain-verification
+    interval: 2s
+    rules:
+      - alert: VillageControlledPrometheusChainAlert
+        expr: village_milestone9_test_failure == 1
+        for: 0s
+        labels:
+          severity: critical
+          service: village-api
+          source: milestone9-verification
+        annotations:
+          summary: Controlled Milestone 9 alert-chain test
+          description: Verification-only alert proving Prometheus evaluation and Alertmanager dispatch.

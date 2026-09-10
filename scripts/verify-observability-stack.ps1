@@ -29,7 +29,8 @@ try {
         throw "$Name did not become healthy: $Uri"
     }
 
-    Wait-HttpOk 'API' 'http://localhost:8080/health'
+    Wait-HttpOk 'API liveness' 'http://localhost:8080/health'
+    Wait-HttpOk 'API readiness' 'http://localhost:8080/ready'
     Wait-HttpOk 'Prometheus' 'http://localhost:9090/-/ready'
     Wait-HttpOk 'Grafana' 'http://localhost:3000/api/health'
     Wait-HttpOk 'Loki' 'http://localhost:3100/ready'
