@@ -9,6 +9,7 @@ import (
 	"github.com/amyismebyme/the-village/apps/api/internal/health"
 	"github.com/amyismebyme/the-village/apps/api/internal/metrics"
 	"github.com/amyismebyme/the-village/apps/api/internal/middleware"
+	"github.com/amyismebyme/the-village/apps/api/internal/telemetry"
 )
 
 func NewRouter(
@@ -17,7 +18,6 @@ func NewRouter(
 	handler *handlers.Handler,
 	requestTimeout ...time.Duration,
 ) http.Handler {
-
 	mux := http.NewServeMux()
 
 	registerRoutes(
@@ -33,7 +33,7 @@ func NewRouter(
 	}
 
 	return middleware.RequestID(
-		middleware.Tracing(
+		telemetry.Middleware(
 			middleware.Logging(
 				appLogger,
 				metrics.Middleware(

@@ -1,0 +1,65 @@
+# Sprints 23–24 — Observability Security + Operational Verification
+
+## Phase 6 — Observability security
+
+### 9.15 Sensitive telemetry review
+
+Audit logs, trace attributes, span events, metric labels, and error messages.
+
+Explicitly prohibit access tokens, client secrets, Authorization headers, database passwords, full DSNs, cookies, and credentials.
+
+Implementation:
+
+- `internal/observability` owns the reusable sanitization policy.
+- `internal/logger` wraps the configured slog handler with `SanitizingHandler`.
+- Sensitive keys are replaced with `[REDACTED]`.
+- Known secret-bearing patterns are redacted from otherwise-safe strings and errors.
+- Correlation fields remain available.
+
+### 9.16 Cardinality review
+
+Prometheus dimensions must remain bounded. Dynamic identifiers, request IDs, full URLs, error messages, stack traces, and user-generated titles do not become metric labels.
+
+The Go contract test scans metric and trace attribute definitions for forbidden secret-bearing keys.
+
+## Phase 7 — Operational verification
+
+### 9.17 End-to-end trace verification
+
+`verify-observability-trace.ps1` sends a real `/health` request, extracts the correlated trace ID from API logs, and queries Tempo for the trace payload.
+
+The script intentionally avoids hard-coding exact span names because those names are owned by the current instrumentation implementation.
+
+### 9.18 Log ↔ trace correlation test
+
+The same trace ID is taken from the API log record and used for the Tempo lookup. Grafana should be used to verify the reverse navigation from the trace back to Loki logs.
+
+### 9.19 Failure trace scenarios
+
+`verify-observability-failure-traces.ps1` accepts a known trace ID and checks for bounded markers for Reddit 503, rate limiting, timeout, retry exhaustion, database failure, worker failure, and cancellation.
+
+Failure injection is deliberately environment-specific and is not added to production application behavior merely to support observability tests.
+
+
+# Failure Trace Verification Matrix — 9.17–9.19
+
+Each scenario must preserve the same trace across the request/worker boundary and identify the failing layer.
+
+| Scenario | Expected trace evidence | Expected failure location |
+|---|---|---|
+| Happy path | HTTP → service → external → database | no error |
+| Reddit 503 | HTTP → service → Reddit external span; bounded error status/type | external Reddit request |
+| Rate limiting | external span plus rate-limit wait event/span or bounded attribute | rate limiter |
+| Timeout | parent span ends with timeout/error status; child external span shows timeout | external request or DB |
+| Retry exhaustion | repeated retry events/spans under one logical operation; final exhaustion marker | retry policy / external operation |
+| Database failure | service span → DB span with error status | database |
+| Worker failure | `reddit.ingest` worker parent → child failure span/event | worker / downstream operation |
+| Context cancellation | spans end with cancellation/error status without secret-bearing data | cancelled operation |
+
+## Pass criteria
+
+- One end-to-end trace ID per logical request/worker execution.
+- Child spans have bounded names and operation attributes.
+- Failure spans identify the failing layer.
+- No secrets appear in span attributes or events.
+- Correlated logs contain the same `trace_id` and `span_id` when the active context is available.
