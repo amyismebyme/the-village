@@ -34,27 +34,29 @@ func Run() error {
 
 	if err := config.Validate(cfg); err != nil {
 		return fmt.Errorf(
-			"validate configuration: %w",
+			"Issue with app configuration: %w",
 			err,
 		)
 	}
 
 	if err := cfg.Database.Validate(); err != nil {
 		return fmt.Errorf(
-			"database configuration: %w",
+			"Issue with database configuration: %w",
 			err,
 		)
 	}
 
+	//global structured logger initialized
 	appLogger := logger.New(cfg)
 
+	// Setup configures tracing and intentionally fails open.
 	telemetryShutdown, err := telemetry.Setup(
 		context.Background(),
 		telemetry.LoadFromEnv(os.Getenv),
 		appLogger,
 	)
 	if err != nil {
-		return fmt.Errorf("initialize telemetry: %w", err)
+		return fmt.Errorf("initialize error in telemetry: %w", err)
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
@@ -88,7 +90,7 @@ func Run() error {
 	}()
 
 	//------------------------------------------------------------------
-	// Health
+	// Health check for db based on ready vs healthy
 	//------------------------------------------------------------------
 
 	healthRegistry := health.NewRegistry()
@@ -98,7 +100,7 @@ func Run() error {
 	)
 
 	//------------------------------------------------------------------
-	// Metrics
+	// Metrics collection below
 	//------------------------------------------------------------------
 
 	stats := db.Stats()
@@ -124,7 +126,7 @@ func Run() error {
 	}
 
 	//------------------------------------------------------------------
-	// Cache
+	// Cache setup for the application
 	//------------------------------------------------------------------
 
 	var (
@@ -180,6 +182,7 @@ func Run() error {
 
 	//------------------------------------------------------------------
 	// Dependency Injection
+	// creates the PostgreSQL implementation.
 	//------------------------------------------------------------------
 
 	communityRepository := postgres.NewCommunityRepository(
