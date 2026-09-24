@@ -34,14 +34,14 @@ func Run() error {
 
 	if err := config.Validate(cfg); err != nil {
 		return fmt.Errorf(
-			"Issue with app configuration: %w",
+			"issue with app configuration: %w",
 			err,
 		)
 	}
 
 	if err := cfg.Database.Validate(); err != nil {
 		return fmt.Errorf(
-			"Issue with database configuration: %w",
+			"issue with database configuration: %w",
 			err,
 		)
 	}
