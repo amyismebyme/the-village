@@ -70,6 +70,33 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    container_name: village-alertmanager
+    command:
+      [
+        "--config.file=/etc/alertmanager/alertmanager.yml",
+        "--storage.path=/alertmanager"
+      ]
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./infra/docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9093/-/ready >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
   prometheus:
@@ -83,9 +110,15 @@ services:
       - ./infra/docker/prometheus/recording_rules.yml:/etc/prometheus/recording_rules.yml:ro
     depends_on:
       village-api:
-        condition: service_started
+        condition: service_healthy
       alertmanager:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/ready >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
   loki-init:
@@ -115,6 +148,12 @@ services:
     depends_on:
       loki-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/ready >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
   tempo-init:
@@ -154,30 +193,9 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  alertmanager:
-    image: prom/alertmanager:v0.34.0
-    container_name: village-alertmanager
-    command:
-      [
-        "--config.file=/etc/alertmanager/alertmanager.yml",
-        "--storage.path=/alertmanager"
-      ]
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./infra/docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - alertmanager-data:/alertmanager
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9093/-/ready >/dev/null 2>&1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-    restart: unless-stopped
-
   grafana:
     image: grafana/grafana
-    container_name: grafana
+    container_name: village-grafana
     ports:
       - "3000:3000"
     volumes:
@@ -185,9 +203,9 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       prometheus:
-        condition: service_started
+        condition: service_healthy
       loki:
-        condition: service_started
+        condition: service_healthy
       tempo:
         condition: service_healthy
     healthcheck:
