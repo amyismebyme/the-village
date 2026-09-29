@@ -48,7 +48,8 @@ The project currently contains a working Go API foundation and a partially imple
 - Frontend/UI application
 - OpenAPI specification
 - CI workflows for build, test, race, lint, integration, and vulnerability verification
-- Kubernetes, Terraform, Grafana dashboards, Loki, and OpenTelemetry
+- Docker Compose observability stack (Prometheus, Alertmanager, Grafana, Loki, Tempo, OpenTelemetry)
+- Kubernetes/Helm/GitOps are the planned Milestone 10 production-operations path
 
 ## Repository layout
 
