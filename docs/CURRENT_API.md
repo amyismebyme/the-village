@@ -1,6 +1,6 @@
 # Current HTTP API
 
-This document describes routes that are currently registered in `internal/server/router.go`. Community CRUD routes are not yet available.
+This document describes routes that are currently registered in `internal/server/router.go`.
 
 ## `GET /`
 
@@ -8,40 +8,42 @@ Basic root response indicating that the API is running.
 
 ## `GET /health`
 
-Dependency-aware health endpoint.
+Process liveness endpoint.
 
 Healthy response:
 
 ```json
 {
-  "status": "healthy",
-  "checks": {
-    "database": "healthy"
-  }
+  "status": "healthy"
 }
 ```
 
-- Returns `200 OK` when all registered checks pass.
-- Returns `503 Service Unavailable` when a dependency is unhealthy or no registry is configured.
+- Returns `200 OK` when the API process can serve the request.
+- Does not depend on PostgreSQL or other runtime dependencies.
 
-This endpoint currently includes database health, so it is closer to a readiness/dependency-health endpoint than a pure liveness endpoint.
+This endpoint is suitable for container and Kubernetes startup/liveness probes.
 
 ## `GET /ready`
 
-Current response:
+Dependency-aware readiness endpoint.
+
+Ready response:
 
 ```json
 {
-  "status": "ready"
+  "status": "ready",
+  "checks": [
+    {
+      "name": "database"
+    }
+  ]
 }
 ```
 
-The current implementation always returns `200` and does not inspect dependencies. This overlaps semantically with `/health` and should be clarified before deployment.
+- Returns `200 OK` when all registered required checks pass.
+- Returns `503 Service Unavailable` when a required dependency is unhealthy or no registry is configured.
 
-Recommended semantics:
-
-- `/health` or `/live`: process is alive and event loop responds.
-- `/ready`: required dependencies are available and instance can receive traffic.
+This endpoint is suitable for container and Kubernetes readiness probes.
 
 ## `GET /version`
 
@@ -77,18 +79,18 @@ Metrics registered by the application include:
 - `village_build_info`
 - PostgreSQL pool metrics under `village_db_pool_*`
 
-Some metrics are defined and registered but are not yet updated in the request/repository code.
+Additional operational metrics cover external requests/retries, workers, rate limiting, and cache behavior.
 
 ## Planned Community API
 
-The intended first product API is:
+The intended Community API is documented in `docs/openapi.yaml` and currently includes:
 
 ```text
-POST   /communities
-GET    /communities
-GET    /communities/{id}
-PUT    /communities/{id}
-DELETE /communities/{id}
+POST   /api/v1/communities
+GET    /api/v1/communities
+GET    /api/v1/communities/{id}
+PUT    /api/v1/communities/{id}
+DELETE /api/v1/communities/{id}
 ```
 
-Do not implement UI against these routes until the schema and request/response contract are aligned and documented in OpenAPI.
+Keep OpenAPI and integration tests aligned with any future route changes.
