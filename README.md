@@ -9,32 +9,42 @@ This project is intentionally designed as a production-grade engineering system 
 - Build a scalable cloud-native application
 - Demonstrate Google SRE practices
 - Implement observability from day one
-- Deploy using Kubernetes
-- Automate infrastructure using Terraform
-- Practice incident response and reliability engineering
+- Develop production operations skills through load testing, failure injection, orchestration, and incident response
+- Deploy using Kubernetes and Helm as the production-operations path
 
 ## Tech Stack
 
-Frontend
+### Frontend
+
 - React
 - Next.js
 - TypeScript
 
-Backend
+### Backend
+
 - Go
 
-Infrastructure
-- Docker
+### Infrastructure
+
+- Docker / Docker Compose
 - Kubernetes
-- Terraform
+- Helm
+- GitOps
 - Google Cloud
 
-Observability
+### Observability
+
+- OpenTelemetry
 - Prometheus
+- Alertmanager
 - Grafana
 - Loki
-- OpenTelemetry
+- Tempo
 
 ## Status
 
-🚧 Building external integrations
+✅ Milestones 1–9 complete: application reliability foundations and observability stack
+
+🚧 Milestone 10 next: k6 load testing, chaos engineering, Kubernetes, Helm, GitOps, and incident-response runbooks
+
+The repository intentionally avoids adding Terraform to Milestone 10. Terraform can be introduced later when there is a concrete infrastructure-automation need.
