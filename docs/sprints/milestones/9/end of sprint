@@ -2,7 +2,7 @@
 
 ## 9.20 Alert firing tests
 
-Deliver deterministic Prometheus rule tests plus a live Alertmanager routing-state test. Controlled conditions cover API 5xx, external 5xx, retry exhaustion, worker failures, rate-limit pressure, cache degradation, database connection loss, and API unavailability.
+Deliver deterministic Prometheus rule tests plus a live end-to-end alert-chain test. The live test stops the API, waits for Prometheus to fire `VillageAPIUnavailable`, verifies Alertmanager receives the Prometheus-fired alert, and restores the API. Controlled rule conditions cover API 5xx, external 5xx, retry exhaustion, worker failures, rate-limit pressure, cache degradation, database connection loss, and API unavailability.
 
 ## 9.21 Telemetry overhead benchmark
 
@@ -14,7 +14,7 @@ Verify API availability while Tempo, Loki, or Alertmanager is stopped. Trace exp
 
 ## 9.23 Documentation
 
-Add `docs/OBSERVABILITY.md` covering metrics, logs, traces, Loki, Tempo, Prometheus, Alertmanager, Grafana, and an alert-to-dependency troubleshooting flow.
+Add `docs/OBSERVABILITY.md` as the canonical operator guide covering metrics, logs, traces, Loki, Tempo, Prometheus, Alertmanager, Grafana, health semantics, alert flow, and troubleshooting.
 
 ## 9.24 Docker observability verification
 
