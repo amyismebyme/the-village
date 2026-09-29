@@ -10,15 +10,13 @@
 
 ## Important module note
 
-The repository currently contains both a root `go.mod` and `apps/api/go.mod`, and both declare the same module path. This is confusing and can cause commands to operate against different dependency graphs depending on the current directory.
+The repository contains a root `go.mod` and `apps/api/go.mod`, and the API commands intentionally run from `apps/api`.
 
-Until this is cleaned up, run Go commands from:
+Use the root Makefile for common project commands or run Go commands directly from:
 
 ```text
 apps/api
 ```
-
-Recommended cleanup: remove the root module and treat `apps/api` as the single Go module, or intentionally create a `go.work` workspace if multiple Go modules are planned.
 
 ## Running the API locally
 
@@ -55,13 +53,9 @@ From the repository root:
 docker compose up --build
 ```
 
-Current caveats:
+The local stack includes PostgreSQL, migrations, the API, Prometheus, Grafana, Loki, Tempo, and Alertmanager.
 
-- The Compose file references `./docker/postgres/init.sql`, which is not present in the reviewed ZIP.
-- Prometheus references `./infra/docker/prometheus/prometheus.yml`, which is not present in the reviewed ZIP.
-- The API image requires PostgreSQL to be ready, but `depends_on` alone does not wait for readiness.
-
-These paths and startup dependencies must be corrected before the full stack is reliable.
+Compose startup dependencies use health/completion conditions where a service must be operational before its dependent starts. The API remains independent of telemetry backend availability.
 
 ## Common Go commands
 
@@ -80,20 +74,19 @@ Lint:
 golangci-lint run
 ```
 
-## Makefile note
+## Makefile commands
 
-The root Makefile invokes Go commands relative to the repository root, but the active API module is under `apps/api`. As written, targets may use the duplicate root module rather than the API module.
+The root Makefile runs Go commands from `apps/api` so they use the API module consistently.
 
-Recommended change:
+Examples:
 
-```make
-API_DIR := apps/api
-
-test:
-	cd $(API_DIR) && go test ./...
+```bash
+make test
+make test-integration
+make test-race
+make vet
+make lint
 ```
-
-Apply the same pattern to `run`, `build`, `vet`, `fmt`, and `lint`.
 
 ## Configuration
 
@@ -154,8 +147,6 @@ For each new domain, use this sequence:
 10. OpenAPI documentation
 11. UI client and screens
 
-
-
 ## Router Verification
 
 Before completing a router change, verify the complete assembled router rather than only individual route registration functions.
@@ -168,22 +159,46 @@ go test ./...
 go test -race ./...
 go vet ./...
 golangci-lint run
-## Milestone verification commands
-
-Run the standard quality gate with:
-
-```bash
-make verify-milestone19
 ```
 
-Run the opt-in live Reddit smoke test only when Reddit credentials are intentionally available in the environment:
+## Observability Verification
 
-```bash
-./scripts/reddit-live-smoke.sh toronto
-```
+From the repository root:
 
 Windows:
 
 ```powershell
-.\scripts\reddit-live-smoke.ps1 -Subreddit toronto
+.scriptserify-observability-stack.ps1
+.scripts	est-alert-chain.ps1
+```
+
+Shell:
+
+```bash
+./scripts/verify-observability-stack.sh
+./scripts/test-alert-chain.sh
+```
+
+The canonical operator guide is `docs/OBSERVABILITY.md`.
+
+## Milestone verification
+
+Run the Milestone 9 gate with:
+
+Windows:
+
+```powershell
+.scriptserify-milestone9.ps1
+```
+
+Shell:
+
+```bash
+./scripts/verify-milestone9.sh
+```
+
+Run the opt-in live Reddit smoke test only when Reddit credentials are intentionally available in the environment:
+
+```powershell
+.scriptseddit-live-smoke.ps1 -Subreddit toronto
 ```
