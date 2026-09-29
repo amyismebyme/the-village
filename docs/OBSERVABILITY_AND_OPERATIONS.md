@@ -8,63 +8,51 @@ Request middleware currently logs:
 
 - request ID
 - HTTP method
-- path
+- normalized route
 - status
 - duration in milliseconds
+- trace ID/span ID when a valid span is present
 
 Panic recovery logs the request ID, method, path, and recovered value.
 
-Recommended additions:
-
-- remote/client address only if operationally needed and privacy-reviewed
-- user/member ID after authentication
-- route template rather than raw path for cardinality control
-- response size
-- trace ID after tracing is introduced
-
-Never log passwords, tokens, private messages, or sensitive mental-health information.
+Never log passwords, tokens, private messages, or sensitive application data.
 
 ## Request IDs
 
 Request IDs are placed in context and used by logging and recovery middleware. Preserve the ID in handler/service logs and return it in error responses so user reports can be correlated with logs.
 
+Trace IDs and span IDs provide the cross-service correlation path into OpenTelemetry/Tempo.
+
 ## Metrics
 
-The application registers HTTP, panic, error, database-query, build-info, and pool metrics.
+The application registers HTTP, panic, error, database-query, external integration, worker, cache, rate-limiter, build-info, and pool metrics.
 
-### Current concern
+Prometheus recording rules provide higher-level operational signals such as:
 
-Several collectors are registered but not actively updated in the reviewed code:
+- HTTP 5xx ratio
+- HTTP request p95
+- external request rate and 5xx ratio
+- worker failure rate
+- rate-limiter pressure
+- cache hit ratio
 
-- HTTP counters/histograms/in-flight gauge
-- panic counter
-- application error counter
-- database query counters/histograms
-
-Registering a collector does not produce meaningful telemetry unless code increments or observes it.
-
-The next cleanup should either wire these metrics into middleware/repositories or remove them until they are used.
-
-### Cardinality guidance
-
-Do not label metrics with raw IDs, slugs, URLs, request IDs, or unbounded error text. For HTTP metrics, use normalized route names such as `/communities/{id}` rather than `/communities/123`.
+Do not label metrics with raw IDs, slugs, URLs, request IDs, or unbounded error text. For HTTP metrics, use normalized route names such as `/communities/{id}` rather than concrete IDs.
 
 ## Health, liveness, and readiness
 
 Current behavior:
 
-- `/health` checks PostgreSQL and returns 503 on dependency failure.
-- `/ready` always reports ready.
-- Docker `HEALTHCHECK` calls `/health`.
+- `/health` is a process liveness endpoint and does not depend on PostgreSQL.
+- `/ready` is a dependency-aware readiness endpoint and evaluates registered checks, including PostgreSQL.
+- `/health` returns `200` when the process can serve requests.
+- `/ready` returns `200` when required checks pass and `503` when a required dependency is unhealthy.
 
-Recommended behavior:
+Operational probe semantics:
 
-- `/live`: only verifies that the process can respond.
-- `/ready`: verifies required dependencies and migration compatibility.
-- Docker/Kubernetes liveness probes use `/live`.
-- Kubernetes readiness probes use `/ready`.
+- startup/liveness → `/health`
+- readiness → `/ready`
 
-Using a database-dependent endpoint for liveness can cause restart loops during a database outage.
+Using a dependency-dependent endpoint for liveness can cause unnecessary process restarts during dependency outages, so keep the two responsibilities separate.
 
 ## Graceful shutdown
 
@@ -74,23 +62,17 @@ Future background workers must also receive cancellation and shut down within th
 
 ## Initial service-level indicators
 
-Once Community APIs exist, begin with:
+Use the following as the initial operational measurement set:
 
 - request success rate excluding expected 4xx responses
 - p50/p95/p99 request latency by normalized route and method
 - availability of read and write paths
 - database pool saturation
 - database query latency
+- external integration error/retry rates
+- worker failure rate
 
-## Initial SLO example
-
-Do not finalize an SLO before usage data exists. A reasonable starting experiment could be:
-
-- 99.5% successful Community API requests over 30 days
-- 95% of read requests under 300 ms
-- 95% of write requests under 500 ms
-
-Review and adjust based on user impact and operational cost.
+Do not finalize an SLO target before production usage data exists.
 
 ## Alerting principles
 
@@ -101,8 +83,22 @@ Alert on symptoms that affect users:
 - readiness failure across enough replicas to reduce capacity
 - connection-pool exhaustion
 - migration or deployment failure
+- external dependency failure when user impact is sustained
 
 Avoid paging on every single error or transient dependency check.
+
+## Observability backends
+
+The local stack uses:
+
+- Prometheus for metrics and rule evaluation
+- Alertmanager for alert routing and retention
+- Grafana for dashboards and investigation
+- Loki for structured logs
+- Tempo for distributed traces
+- OpenTelemetry for trace instrumentation/export
+
+See `docs/OBSERVABILITY.md` for the operator-facing workflow.
 
 ## Runbook: API fails to start
 
@@ -114,9 +110,9 @@ Avoid paging on every single error or transient dependency check.
 6. Check pool configuration values.
 7. Confirm the configured Go binary/container image exists.
 
-## Runbook: `/health` returns 503
+## Runbook: `/ready` returns 503
 
-1. Inspect the response checks map.
+1. Inspect the response checks map/array.
 2. If `database` is unhealthy, test PostgreSQL connectivity.
 3. Check container status and database logs.
 4. Check connection-pool metrics.
