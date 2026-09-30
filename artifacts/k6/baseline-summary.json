@@ -1,0 +1,161 @@
+{
+    "metrics": {
+        "http_req_waiting": {
+            "med": 7.4453,
+            "max": 53.155387,
+            "p(90)": 17.659167999999998,
+            "p(95)": 20.035141099999976,
+            "avg": 9.396876156217157,
+            "min": 1.860485
+        },
+        "vus": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "data_received": {
+            "count": 1622151,
+            "rate": 26953.02625406063
+        },
+        "http_req_duration": {
+            "avg": 9.523613254640962,
+            "min": 1.93388,
+            "med": 7.583697,
+            "max": 53.303564,
+            "p(90)": 17.772501,
+            "p(95)": 20.136724399999995,
+            "thresholds": {
+                "p(95)<1000": false
+            }
+        },
+        "data_sent": {
+            "count": 316179,
+            "rate": 5253.506540379186
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 1.93388,
+            "med": 7.583697,
+            "max": 53.303564,
+            "p(90)": 17.772501,
+            "p(95)": 20.136724399999995,
+            "avg": 9.523613254640962
+        },
+        "http_req_connecting": {
+            "med": 0,
+            "max": 12.93922,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.026092113134851137,
+            "min": 0
+        },
+        "http_req_blocked": {
+            "p(90)": 0.010647799999999999,
+            "p(95)": 0.012372699999999992,
+            "avg": 0.03784931523642725,
+            "min": 0.000972,
+            "med": 0.006782,
+            "max": 14.095548
+        },
+        "http_req_tls_handshaking": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0
+        },
+        "http_req_sending": {
+            "max": 4.497881,
+            "p(90)": 0.05796199999999998,
+            "p(95)": 0.07463429999999979,
+            "avg": 0.029484922591943984,
+            "min": 0.002787,
+            "med": 0.018979
+        },
+        "iterations": {
+            "count": 2855,
+            "rate": 47.43756281341447
+        },
+        "iteration_duration": {
+            "p(90)": 218.7006108,
+            "p(95)": 221.16000599999998,
+            "avg": 210.42314761190866,
+            "min": 202.189223,
+            "med": 208.495089,
+            "max": 254.304621
+        },
+        "http_req_receiving": {
+            "avg": 0.09725217583187393,
+            "min": 0.007145,
+            "med": 0.076279,
+            "max": 3.267709,
+            "p(90)": 0.1723237999999998,
+            "p(95)": 0.21811079999999994
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "checks": {
+            "passes": 5122,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 2855,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_reqs": {
+            "count": 2855,
+            "rate": 47.43756281341447
+        }
+    },
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "GET /ready returns 200": {
+                    "name": "GET /ready returns 200",
+                    "path": "::GET /ready returns 200",
+                    "id": "d6f676f36d6d6ba73874a317951f470a",
+                    "passes": 216,
+                    "fails": 0
+                },
+                "GET /status returns 200": {
+                    "id": "5ff354ae1fb0e6cc64f700584ae10e98",
+                    "passes": 151,
+                    "fails": 0,
+                    "name": "GET /status returns 200",
+                    "path": "::GET /status returns 200"
+                },
+                "GET /api/v1/communities returns 200": {
+                    "name": "GET /api/v1/communities returns 200",
+                    "path": "::GET /api/v1/communities returns 200",
+                    "id": "fc6eda79d39164a36346e648f4c8f12a",
+                    "passes": 2267,
+                    "fails": 0
+                },
+                "community list response is JSON": {
+                    "name": "community list response is JSON",
+                    "path": "::community list response is JSON",
+                    "id": "20ab17bd0331a5c2d64516b4b104fdd6",
+                    "passes": 2267,
+                    "fails": 0
+                },
+                "GET /health returns 200": {
+                    "fails": 0,
+                    "name": "GET /health returns 200",
+                    "path": "::GET /health returns 200",
+                    "id": "fc29c229986e0f7d4812eca2fbae48b2",
+                    "passes": 221
+                }
+            },
+        "name": ""
+    }
+}

@@ -34,6 +34,10 @@ TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 .PHONY: verify-build-metadata
 .PHONY: vulncheck
 .PHONY: reddit-live-smoke
+.PHONY: k6-smoke
+.PHONY: k6-baseline
+.PHONY: k6-sustained
+.PHONY: k6-spike
 
 .DEFAULT_GOAL := help
 
@@ -56,6 +60,11 @@ help:
 	@echo "  make docker-down       Stop local Docker stack"
 	@echo "  make docker-logs       Follow Docker Compose logs"
 	@echo ""
+	@echo "  make k6-smoke          Run k6 endpoint + CRUD smoke test"
+	@echo "  make k6-baseline       Run 10-VU k6 baseline"
+	@echo "  make k6-sustained      Run staged sustained-load test"
+	@echo "  make k6-spike          Run spike-load test"
+	@echo ""
 	@echo "  make clean             Remove local build artifacts"
 	@echo ""
 
@@ -68,13 +77,39 @@ build:
 
 build-release:
 	mkdir -p $(BIN_DIR)
-	GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo local); 	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); 	cd $(API_DIR) && $(GO) build 		-ldflags="-s -w -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$GIT_COMMIT -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production" 		-o ../../$(BINARY) ./cmd/api
+	GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo local); \
+	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+	cd $(API_DIR) && $(GO) build \
+		-ldflags="-s -w -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$GIT_COMMIT -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production" \
+		-o ../../$(BINARY) ./cmd/api
 
 test:
 	cd $(API_DIR) && $(GO) test ./...
 
 test-integration:
-	COMPOSE_FILE="$$(pwd)/$(TEST_COMPOSE_FILE)"; 	trap '$(COMPOSE) -f "$$COMPOSE_FILE" down -v --remove-orphans' EXIT INT TERM; 	$(COMPOSE) -f "$$COMPOSE_FILE" up -d --wait && 	$(DOCKER) run --rm 		--network host 		-v "$$(pwd)/$(TEST_MIGRATIONS_DIR):/migrations:ro" 		$(TEST_MIGRATE_IMAGE) 		-path=/migrations 		-database="$(TEST_DB_URL)" 		up && 	cd $(API_DIR) && 		APP_ENV=integration 		DB_HOST=localhost 		DB_PORT=5433 		DB_USER=village 		DB_PASSWORD=village 		DB_NAME=village 		DB_SSLMODE=disable 		$(GO) test 			-tags=integration 			./internal/integration/... 			-v 			-count=1
+	COMPOSE_FILE="$$(pwd)/$(TEST_COMPOSE_FILE)"; \
+	trap '$(COMPOSE) -f "$$COMPOSE_FILE" down -v --remove-orphans' EXIT INT TERM; \
+	$(COMPOSE) -f "$$COMPOSE_FILE" up -d --wait && \
+	$(DOCKER) run --rm \
+		--network host \
+		-v "$$(pwd)/$(TEST_MIGRATIONS_DIR):/migrations:ro" \
+		$(TEST_MIGRATE_IMAGE) \
+		-path=/migrations \
+		-database="$(TEST_DB_URL)" \
+		up && \
+	cd $(API_DIR) && \
+		APP_ENV=integration \
+		DB_HOST=localhost \
+		DB_PORT=5433 \
+		DB_USER=village \
+		DB_PASSWORD=village \
+		DB_NAME=village \
+		DB_SSLMODE=disable \
+		$(GO) test \
+			-tags=integration \
+			./internal/integration/... \
+			-v \
+			-count=1
 
 test-race:
 	cd $(API_DIR) && $(GO) test -race ./...
@@ -89,7 +124,11 @@ lint:
 	cd $(API_DIR) && golangci-lint run
 
 docker-build:
-	if [ -f zscaler.crt ]; then 		$(DOCKER) build --pull --secret id=zscaler,src=zscaler.crt -t village-api:local .; 	else 		$(DOCKER) build --pull -t village-api:local .; 	fi
+	if [ -f zscaler.crt ]; then \
+		$(DOCKER) build --pull --secret id=zscaler,src=zscaler.crt -t village-api:local .; \
+	else \
+		$(DOCKER) build --pull -t village-api:local .; \
+	fi
 
 docker-up:
 	$(COMPOSE) up --build
@@ -104,11 +143,35 @@ clean:
 	cd $(API_DIR) && $(GO) clean
 	rm -rf $(BIN_DIR)
 
+
 verify-build-metadata:
-	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); 	cd $(API_DIR) && 	EXPECTED_BUILD_VERSION="$(VERSION)" 	EXPECTED_GIT_COMMIT="$$(git rev-parse HEAD 2>/dev/null || echo local)" 	EXPECTED_BUILD_TIMESTAMP="$$BUILD_TIME" 	EXPECTED_ENVIRONMENT="production" 	$(GO) test ./internal/runtime 		-run '^TestInjectedBuildMetadata$$' 		-count=1 		-ldflags="-X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$(git rev-parse HEAD 2>/dev/null || echo local) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production"
+	BUILD_TIME=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+	cd $(API_DIR) && \
+	EXPECTED_BUILD_VERSION="$(VERSION)" \
+	EXPECTED_GIT_COMMIT="$$(git rev-parse HEAD 2>/dev/null || echo local)" \
+	EXPECTED_BUILD_TIMESTAMP="$$BUILD_TIME" \
+	EXPECTED_ENVIRONMENT="production" \
+	$(GO) test ./internal/runtime \
+		-run '^TestInjectedBuildMetadata$$' \
+		-count=1 \
+		-ldflags="-X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildVersion=$(VERSION) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.GitCommit=$$(git rev-parse HEAD 2>/dev/null || echo local) -X github.com/amyismebyme/the-village/apps/api/internal/runtime.BuildTimestamp=$$BUILD_TIME -X github.com/amyismebyme/the-village/apps/api/internal/runtime.Environment=production"
 
 vulncheck:
 	cd $(API_DIR) && $(GO) run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 
+
 reddit-live-smoke:
 	@./scripts/reddit-live-smoke.sh
+
+
+k6-smoke:
+	@./scripts/run-k6.sh smoke
+
+k6-baseline:
+	@./scripts/run-k6.sh baseline
+
+k6-sustained:
+	@./scripts/run-k6.sh sustained
+
+k6-spike:
+	@./scripts/run-k6.sh spike
