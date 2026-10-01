@@ -1,151 +1,6 @@
 {
-    "root_group": {
-        "checks": {
-            "GET /health returns 200": {
-                "name": "GET /health returns 200",
-                "path": "::GET /health returns 200",
-                "id": "fc29c229986e0f7d4812eca2fbae48b2",
-                "passes": 1,
-                "fails": 0
-            },
-            "GET /ready returns 200": {
-                "passes": 1,
-                "fails": 0,
-                "name": "GET /ready returns 200",
-                "path": "::GET /ready returns 200",
-                "id": "d6f676f36d6d6ba73874a317951f470a"
-            },
-            "GET /api/v1/communities returns 200": {
-                "name": "GET /api/v1/communities returns 200",
-                "path": "::GET /api/v1/communities returns 200",
-                "id": "fc6eda79d39164a36346e648f4c8f12a",
-                "passes": 1,
-                "fails": 0
-            },
-            "community list response is JSON": {
-                "name": "community list response is JSON",
-                "path": "::community list response is JSON",
-                "id": "20ab17bd0331a5c2d64516b4b104fdd6",
-                "passes": 1,
-                "fails": 0
-            },
-            "POST community returns 201": {
-                "passes": 1,
-                "fails": 0,
-                "name": "POST community returns 201",
-                "path": "::POST community returns 201",
-                "id": "c34ecbbc907f3856bc5d06364e173ad6"
-            },
-            "PUT community returns 200": {
-                "name": "PUT community returns 200",
-                "path": "::PUT community returns 200",
-                "id": "08280ffe0c171803d66210232390f1b7",
-                "passes": 1,
-                "fails": 0
-            },
-            "DELETE community returns 204": {
-                "fails": 0,
-                "name": "DELETE community returns 204",
-                "path": "::DELETE community returns 204",
-                "id": "4f022e0741be1c6cc417f760fad1f95a",
-                "passes": 1
-            }
-        },
-        "name": "",
-        "path": "",
-        "id": "d41d8cd98f00b204e9800998ecf8427e",
-        "groups": {}
-    },
     "metrics": {
-        "checks": {
-            "fails": 0,
-            "passes": 7,
-            "value": 1
-        },
-        "http_req_blocked": {
-            "avg": 1.1987873333333334,
-            "min": 0.003021,
-            "med": 0.00421,
-            "max": 7.171585,
-            "p(90)": 3.5887815,
-            "p(95)": 5.38018325
-        },
-        "http_req_duration{expected_response:true}": {
-            "max": 11.510089,
-            "p(90)": 10.10567,
-            "p(95)": 10.8078795,
-            "avg": 6.903997166666667,
-            "min": 3.411204,
-            "med": 6.658008000000001
-        },
-        "data_sent": {
-            "count": 1037,
-            "rate": 20580.856877724444
-        },
-        "http_req_receiving": {
-            "avg": 0.1277585,
-            "min": 0.0635,
-            "med": 0.1293085,
-            "max": 0.16401,
-            "p(90)": 0.163028,
-            "p(95)": 0.163519
-        },
-        "iterations": {
-            "count": 1,
-            "rate": 19.84653507977285
-        },
         "http_req_connecting": {
-            "p(90)": 2.7549055,
-            "p(95)": 4.13235825,
-            "avg": 0.9183018333333334,
-            "min": 0,
-            "med": 0,
-            "max": 5.509811
-        },
-        "iteration_duration": {
-            "avg": 50.17589,
-            "min": 50.17589,
-            "med": 50.17589,
-            "max": 50.17589,
-            "p(90)": 50.17589,
-            "p(95)": 50.17589
-        },
-        "http_reqs": {
-            "count": 6,
-            "rate": 119.0792104786371
-        },
-        "http_req_sending": {
-            "avg": 0.045819,
-            "min": 0.012491,
-            "med": 0.0174475,
-            "max": 0.169748,
-            "p(90)": 0.10736600000000002,
-            "p(95)": 0.138557
-        },
-        "http_req_duration": {
-            "avg": 6.903997166666667,
-            "min": 3.411204,
-            "med": 6.658008000000001,
-            "max": 11.510089,
-            "p(90)": 10.10567,
-            "p(95)": 10.8078795,
-            "thresholds": {
-                "p(95)<1500": false
-            }
-        },
-        "http_req_failed": {
-            "fails": 6,
-            "passes": 0,
-            "thresholds": {
-                "rate<0.02": false
-            },
-            "value": 0
-        },
-        "data_received": {
-            "count": 2006,
-            "rate": 39812.14937002434
-        },
-        "http_req_tls_handshaking": {
             "avg": 0,
             "min": 0,
             "med": 0,
@@ -154,12 +9,135 @@
             "p(95)": 0
         },
         "http_req_waiting": {
-            "med": 6.534744,
-            "max": 11.334804,
-            "p(90)": 9.9406675,
-            "p(95)": 10.637735750000001,
-            "avg": 6.730419666666666,
-            "min": 3.077446
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0
+        },
+        "checks": {
+            "passes": 0,
+            "fails": 5,
+            "value": 0
+        },
+        "data_sent": {
+            "rate": 0,
+            "count": 0
+        },
+        "iterations": {
+            "count": 1,
+            "rate": 139.95037359752232
+        },
+        "http_req_failed": {
+            "passes": 4,
+            "fails": 0,
+            "thresholds": {
+                "rate<0.02": true
+            },
+            "value": 1
+        },
+        "http_req_receiving": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "data_received": {
+            "count": 0,
+            "rate": 0
+        },
+        "http_req_tls_handshaking": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0
+        },
+        "http_req_blocked": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_sending": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "iteration_duration": {
+            "avg": 6.771832,
+            "min": 6.771832,
+            "med": 6.771832,
+            "max": 6.771832,
+            "p(90)": 6.771832,
+            "p(95)": 6.771832
+        },
+        "http_req_duration": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "thresholds": {
+                "p(95)<1500": false
+            }
+        },
+        "http_reqs": {
+            "count": 4,
+            "rate": 559.8014943900893
         }
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "GET /health returns 200": {
+                    "fails": 1,
+                    "name": "GET /health returns 200",
+                    "path": "::GET /health returns 200",
+                    "id": "fc29c229986e0f7d4812eca2fbae48b2",
+                    "passes": 0
+                },
+                "GET /ready returns 200": {
+                    "path": "::GET /ready returns 200",
+                    "id": "d6f676f36d6d6ba73874a317951f470a",
+                    "passes": 0,
+                    "fails": 1,
+                    "name": "GET /ready returns 200"
+                },
+                "GET /api/v1/communities returns 200": {
+                    "passes": 0,
+                    "fails": 1,
+                    "name": "GET /api/v1/communities returns 200",
+                    "path": "::GET /api/v1/communities returns 200",
+                    "id": "fc6eda79d39164a36346e648f4c8f12a"
+                },
+                "community list response is JSON": {
+                    "name": "community list response is JSON",
+                    "path": "::community list response is JSON",
+                    "id": "20ab17bd0331a5c2d64516b4b104fdd6",
+                    "passes": 0,
+                    "fails": 1
+                },
+                "POST community returns 201": {
+                    "name": "POST community returns 201",
+                    "path": "::POST community returns 201",
+                    "id": "c34ecbbc907f3856bc5d06364e173ad6",
+                    "passes": 0,
+                    "fails": 1
+                }
+            },
+        "name": "",
+        "path": ""
     }
 }

@@ -38,6 +38,9 @@ TEST_MIGRATE_IMAGE := migrate/migrate:v4.18.3
 .PHONY: k6-baseline
 .PHONY: k6-sustained
 .PHONY: k6-spike
+.PHONY: chaos-api-kill
+.PHONY: chaos-postgres-outage
+.PHONY: chaos-tempo-outage
 
 .DEFAULT_GOAL := help
 
@@ -175,3 +178,12 @@ k6-sustained:
 
 k6-spike:
 	@./scripts/run-k6.sh spike
+
+chaos-api-kill:
+	@CHAOS_CONFIRM=1 ./scripts/run-chaos.sh api-kill
+
+chaos-postgres-outage:
+	@CHAOS_CONFIRM=1 ./scripts/run-chaos.sh postgres-outage
+
+chaos-tempo-outage:
+	@CHAOS_CONFIRM=1 ./scripts/run-chaos.sh tempo-outage

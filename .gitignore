@@ -38,3 +38,9 @@ $RECYCLE.BIN/
 .env
 
 zscaler.crt
+# Local k6 performance artifacts
+/artifacts/k6/*
+!/artifacts/k6/.gitkeep
+
+/artifacts/chaos/*
+!/artifacts/chaos/.gitkeep
