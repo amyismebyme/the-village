@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: village-api
+  namespace: village
+  labels:
+    app.kubernetes.io/name: village-api
+    app.kubernetes.io/part-of: the-village
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: village-api

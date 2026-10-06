@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: village-migrate
+  namespace: village
+  labels:
+    app.kubernetes.io/name: village-migrate
+    app.kubernetes.io/part-of: the-village
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: village-migrate
+        app.kubernetes.io/part-of: the-village
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: migrate/migrate:v4.18.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              value: village-postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: village-postgres-secret
+                  key: POSTGRES_DB
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: village-postgres-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: village-postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: DB_SSLMODE
+              value: disable
+          command:
+            - /bin/sh
+            - -c
+            - migrate -path=/migrations -database="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" up
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: village-migrations
