@@ -1,0 +1,21 @@
+# Sprint 28 Verification Checklist
+
+- [ ] Docker Desktop Kubernetes enabled
+- [ ] `kubectl cluster-info` succeeds
+- [ ] `village-api:local` exists locally
+- [ ] namespace `village` exists
+- [ ] PostgreSQL StatefulSet ready
+- [ ] PostgreSQL PVC bound
+- [ ] migration ConfigMap created
+- [ ] migration Job completed
+- [ ] API Deployment has 2 ready replicas
+- [ ] `GET /health` returns 200
+- [ ] `GET /ready` returns 200
+- [ ] scale API to 3 replicas
+- [ ] 3 replicas become available
+- [ ] delete one API pod
+- [ ] replacement API pod becomes ready
+- [ ] 3 replicas become available again
+- [ ] `/health` and `/ready` remain healthy
+- [ ] `kubectl top pods -n village` checked
+- [ ] HPA tested only when metrics-server exists

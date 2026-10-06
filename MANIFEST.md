@@ -1,44 +1,132 @@
-# Sprint 27 — Chaos: Controlled Failure + Recovery
+# Sprint 28 — Kubernetes: Real Deployment + Scaling + Recovery
 
-This patch targets a The Village repository that already contains Sprint 26 k6 changes.
+This is an incremental patch intended for the repository after Sprint 27. It adds only the Kubernetes layer and operator scripts; it does not change application Go code or Zscaler handling.
 
 ## Added
 
-- `scripts/run-chaos.ps1` — Windows/PowerShell chaos runner.
-- `scripts/run-chaos.sh` — shell chaos runner.
-- `docs/chaos/CHAOS_RUNBOOK.md` — experiment procedure, expected behavior, safety and evidence guidance.
-- `artifacts/chaos/.gitkeep` — keeps the evidence directory in Git.
+`infra/kubernetes/`
+- `namespace.yaml`
+- `configmap.yaml`
+- `postgres.yaml`
+- `migration-job.yaml`
+- `api.yaml`
+- `pdb.yaml`
+- `hpa.yaml`
+- `README.md`
 
-## Modified
+`scripts/`
+- `k8s-deploy.ps1`
+- `k8s-deploy.sh`
+- `k8s-scale.ps1`
+- `k8s-scale.sh`
+- `verify-kubernetes.ps1`
+- `verify-kubernetes.sh`
+- `k8s-down.ps1`
+- `k8s-down.sh`
 
-- `Makefile` — adds `chaos-api-kill`, `chaos-postgres-outage`, and `chaos-tempo-outage` targets.
-- `.gitignore` — ignores generated chaos evidence while retaining `.gitkeep`.
+`docs/kubernetes/`
+- `SPRINT28_KUBERNETES.md`
+- `SPRINT28_CHECKLIST.md`
 
-The Makefile and `.gitignore` included here are complete replacement files based on the Sprint 26 state on `main`.
+## Architecture
 
-## Experiments
+```text
+Docker Desktop Kubernetes
+        │
+        ├── PostgreSQL StatefulSet
+        │       └── 2Gi PVC
+        │
+        ├── migration Job
+        │
+        └── village-api Deployment
+                ├── 2 replicas by default
+                ├── NodePort 30080
+                ├── startup/liveness -> /health
+                ├── readiness -> /ready
+                ├── PDB minAvailable=1
+                └── optional HPA 2-5 replicas @ 70% CPU
+```
 
-1. `api-kill`
-   - Sends SIGKILL to `village-api`.
-   - Verifies Docker restart recovery.
-   - Verifies `/health`, `/ready`, then k6 smoke.
+## Deployment ordering
 
-2. `postgres-outage`
-   - Stops PostgreSQL.
-   - Verifies `/health` remains 200.
-   - Verifies `/ready` becomes 503.
-   - Restarts PostgreSQL.
-   - Verifies `/ready` returns 200 and k6 smoke passes.
+The scripts intentionally perform:
 
-3. `tempo-outage`
-   - Stops Tempo.
-   - Verifies `/health`, `/ready`, and community listing remain available.
-   - Restarts Tempo.
-   - Verifies k6 smoke.
+```text
+Postgres -> ready -> migration Job -> complete -> API Deployment -> rollout
+```
 
-## Intentionally not changed
+The migration image `migrate/migrate:v4.18.3` is Alpine-based and includes `/bin/sh`, so the migration Job can construct its connection string from Kubernetes Secret environment variables. citeturn495942view0
 
-- Docker Zscaler certificate handling.
-- CI workflows.
-- Application Go code.
-- Kubernetes resources.
+## Secret handling
+
+No PostgreSQL Secret YAML is committed. The deployment scripts create `village-postgres-secret` only when it does not already exist. This avoids accidentally changing a running database's password when the deployment script is run again.
+
+The default local development password is `village`; override the initial value with `VILLAGE_DB_PASSWORD` / `-DbPassword`.
+
+## Run locally
+
+1. Enable Kubernetes in Docker Desktop.
+2. Build `village-api:local` with the existing Docker workflow.
+3. Deploy:
+
+```powershell
+.\scripts\k8s-deploy.ps1
+```
+
+4. Verify:
+
+```powershell
+.\scripts\verify-kubernetes.ps1
+```
+
+5. API:
+
+```text
+http://localhost:30080
+```
+
+## Optional HPA
+
+Check metrics-server:
+
+```powershell
+kubectl top pods -n village
+```
+
+Then:
+
+```powershell
+.\scripts\k8s-deploy.ps1 -EnableHPA
+```
+
+Manual scaling is still the deterministic Sprint 28 scaling path:
+
+```powershell
+.\scripts\k8s-scale.ps1 3
+```
+
+## Recovery
+
+The verification script scales the API to three replicas, deletes one API pod, waits for `/health` and `/ready`, and verifies that three available replicas return.
+
+## Teardown
+
+Keep PostgreSQL data:
+
+```powershell
+.\scripts\k8s-down.ps1
+```
+
+Delete local PostgreSQL data too:
+
+```powershell
+.\scripts\k8s-down.ps1 -DeleteData
+```
+
+## Validation status
+
+The generated YAML parsed successfully and all Bash scripts passed `bash -n`. Actual `kubectl` and Docker Desktop Kubernetes execution was not performed in the generation environment because `kubectl` is unavailable there.
+
+## Deliberately deferred
+
+Helm, GitOps/Argo CD, production ingress/TLS, external secret management, managed Kubernetes, multi-zone PostgreSQL, cluster-wide observability deployment, and cloud storage/backup policy remain later Sprint 29+ work.
