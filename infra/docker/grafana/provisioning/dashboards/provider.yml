@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  - name: Village Kubernetes
+    orgId: 1
+    folder: Village / Kubernetes
+    folderUid: village-k8s
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

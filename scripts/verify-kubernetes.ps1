@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [int]$RecoveryTimeoutSeconds = 120,
-    [string]$ApiUrl = 'http://localhost:30080'
+    [string]$ApiUrl = 'http://localhost:8080'
 )
 
 $ErrorActionPreference = 'Stop'
